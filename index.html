@@ -228,6 +228,114 @@
         </button>
       </div>
     </form>
+
+    <!-- LINHA 2: RACIONAL DO CÁLCULO -->
+    <section id="linha-2" class="result-section card" style="display: none;" aria-live="polite">
+      <div class="result-section-header">
+        <h2>Racional do Cálculo</h2>
+        <div class="btn-group export-bar">
+          <button type="button" class="btn btn-icon" id="btn-copy-linha-2" title="Copiar como PNG" aria-label="Copiar racional do cálculo como PNG">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+              <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+            </svg>
+          </button>
+          <button type="button" class="btn btn-icon" id="btn-download-linha-2" title="Baixar como SVG" aria-label="Baixar racional do cálculo como SVG">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="rationale-grid">
+        <!-- Bloco 1: Dimensionamento -->
+        <div class="rationale-block result-card" id="block-dimensionamento">
+          <h4>Dimensionamento</h4>
+          <div class="katex-zone" id="formula-nom"></div>
+          <div class="math-substitution" id="sub-nom"></div>
+          <div class="math-result" id="result-nom"></div>
+          <div class="bess-qty-container">
+            <span class="bess-qty-value" id="bess-qty"></span>
+          </div>
+          <div class="warning-label" id="warning-subdimensionado" style="display: none;">
+            ⚠️ Sistema subdimensionado. A capacidade instalada é inferior à necessária e a degradação comprometerá o desempenho antes do EOL previsto.
+          </div>
+        </div>
+        
+        <!-- Bloco 2: Energia por Ciclo -->
+        <div class="rationale-block result-card" id="block-energia">
+          <h4>Energia por Ciclo</h4>
+          <ul class="energy-flow-list">
+            <li>
+              <span class="label">Energia de Carga (E<sub>carga</sub>)</span>
+              <span class="value" id="val-carga"></span>
+              <span class="subtext" id="sub-val-carga"></span>
+            </li>
+            <li>
+              <span class="label">Energia de Descarga (E<sub>descarga</sub>)</span>
+              <span class="value" id="val-descarga"></span>
+              <span class="subtext" id="sub-val-descarga"></span>
+            </li>
+            <li>
+              <span class="label">Energia Compensada (E<sub>compensada</sub>)</span>
+              <span class="value" id="val-compensada"></span>
+              <span class="subtext" id="sub-val-compensada"></span>
+            </li>
+            <li>
+              <span class="label">Energia Consumida (E<sub>consumida</sub>)</span>
+              <span class="value" id="val-consumida"></span>
+              <span class="subtext" id="sub-val-consumida"></span>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Bloco 3: Resumo Econômico -->
+        <div class="rationale-block result-card" id="block-economico">
+          <h4>Resumo Econômico (Ciclo)</h4>
+          <ul class="economic-list">
+            <li>
+              <span class="label">Custo Carga FP</span>
+              <span class="value" id="val-custo-fp"></span>
+            </li>
+            <li>
+              <span class="label">Custo Evitado HP</span>
+              <span class="value" id="val-custo-hp"></span>
+            </li>
+            <li class="savings-item">
+              <span class="label">Economia Líquida</span>
+              <span class="value highlight" id="val-economia"></span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- LINHA 3: DIAGRAMAS E CURVAS -->
+    <div class="grid-two-cols">
+      <!-- Coluna 1: Diagrama de Funcionamento BESS -->
+      <section id="linha-3-col1" class="result-section card" style="display: none;" aria-live="polite">
+        <div class="result-section-header">
+          <h2>Diagrama de Funcionamento BESS</h2>
+          <div class="btn-group export-bar">
+            <button type="button" class="btn btn-icon" id="btn-copy-linha-3" title="Copiar como PNG" aria-label="Copiar diagrama de funcionamento como PNG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn btn-icon" id="btn-download-linha-3" title="Baixar como SVG" aria-label="Baixar diagrama de funcionamento como SVG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="svg-container" id="diagram-container"></div>
+      </section>
+    </div>
   </main>
 
   <!-- Carrega configurações locais e o client Supabase -->

@@ -17,6 +17,7 @@ Abra o terminal na pasta da ferramenta e execute:
 python -m http.server 5500
 ```
 Em seguida, acesse `http://localhost:5500`.
+Ou, `http://localhost:5500/index.html`.
 
 ### Opção 3: Node.js (npx serve)
 Execute:
