@@ -1,6 +1,9 @@
 # Arquivos confidenciais e documentação de governança interna
 docs/
 
+# OpenSpec change artifacts
+openspec/
+
 # Configurações de ambiente e chaves locais
 .env
 .env.local
@@ -30,3 +33,11 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local test mock bridge
+mock-bridge.js
+
+# Local AI tooling index
+.codegraph/
+.opencode/
+

@@ -14,19 +14,220 @@
   <!-- Supabase JS Client SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body style="display: none;">
+<body>
+
+  <!-- loading-overlay para mitigar tela branca em caso de falha de carregamento do JS -->
+  <div id="loading-overlay" style="position: fixed; inset: 0; background-color: var(--color-canvas, #101010); display: flex; align-items: center; justify-content: center; z-index: 99999; color: var(--color-ink, #f2f2f2); font-family: var(--font-sans, sans-serif); font-size: 16px; transition: opacity 0.2s ease-in-out;">
+    <div style="text-align: center;">
+      <div style="width: 24px; height: 24px; border: 2px solid var(--color-mute, #8b949e); border-top-color: var(--color-primary, #00d992); border-radius: 50%; animation: spin-loading 1s linear infinite; margin: 0 auto 12px auto;"></div>
+      <span>Carregando...</span>
+    </div>
+  </div>
 
   <!-- Layout Container Base -->
   <main class="container">
-    <div class="card" style="max-width: 600px; margin: 40px auto;">
-      <h2 style="color: var(--color-primary); margin-bottom: var(--spacing-md);">Calculadora BESS</h2>
-      <p id="user-welcome" style="margin-bottom: var(--spacing-lg);">Carregando autenticação...</p>
-      
-      <div style="display: flex; gap: var(--spacing-sm);">
-        <button class="btn btn-primary" onclick="alert('Ação primária executada!')">Ação Principal</button>
-        <button class="btn btn-secondary" onclick="alert('Ação secundária!')">Ação Secundária</button>
+    <header class="header">
+      <h1>Calculadora BESS</h1>
+      <div id="simulations-container" class="simulations-dropdown-container">
+        <span id="user-welcome" class="user-welcome" style="display: none;">Carregando...</span>
+        <!-- Dropdown de simulações (inicialmente oculto ou vazio) -->
+        <select id="simulations-select" class="input-text simulations-select" style="display: none;">
+          <option value="">Carregar simulação...</option>
+        </select>
       </div>
-    </div>
+    </header>
+
+    <!-- O Grid de Parâmetros -->
+    <form id="bess-form" novalidate>
+      <div class="calc-grid">
+        <!-- COLUNA 1 -->
+        <div class="calc-group card" id="group-geral">
+          <div class="calc-group-header" tabindex="0" role="button" aria-expanded="true" aria-controls="group-geral-fields">
+            <h3>Parâmetros Gerais</h3>
+          </div>
+          <div class="calc-group-content" id="group-geral-fields">
+            <div class="calc-field">
+              <label for="geral-label">Nome da Simulação</label>
+              <input type="text" id="geral-label" class="input-text" value="Indústria de Papel - Caso Base">
+              <span class="error-message" id="geral-label-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="geral-estrategia">Estratégia do BESS</label>
+              <select id="geral-estrategia" class="input-text">
+                <option value="load-shifting" selected>Load-Shifting (Deslocamento de Carga)</option>
+                <option value="peak-shaving" disabled title="Em breve">Peak-Shaving (Em breve)</option>
+                <option value="diesel-reduction" disabled title="Em breve">Redução de Diesel (Em breve)</option>
+              </select>
+              <span class="error-message" id="geral-estrategia-error"></span>
+            </div>
+            
+            <div class="calc-field">
+              <label for="geral-aplicacao">Aplicação</label>
+              <input type="text" id="geral-aplicacao" class="input-text" value="Indústria de Papel">
+              <span class="error-message" id="geral-aplicacao-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="geral-regime">Regime de Contratação</label>
+              <select id="geral-regime" class="input-text">
+                <option value="ACR" selected>ACR (Ambiente Regulado)</option>
+                <option value="ACL" disabled title="Em breve">ACL (Ambiente Livre) (Em breve)</option>
+              </select>
+              <span class="error-message" id="geral-regime-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="geral-concessionaria">Concessionária</label>
+              <input type="text" id="geral-concessionaria" class="input-text" value="Enel-CE">
+              <span class="error-message" id="geral-concessionaria-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="geral-grupo-tarifario">Grupo Tarifário</label>
+              <select id="geral-grupo-tarifario" class="input-text">
+                <option value="A4" selected>A4 (2,3 kV a 25 kV)</option>
+                <option value="A3a">A3a (30 kV a 44 kV)</option>
+                <option value="A3">A3 (69 kV)</option>
+                <option value="AS">AS (Subterrâneo)</option>
+              </select>
+              <span class="error-message" id="geral-grupo-tarifario-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="geral-modalidade">Modalidade Tarifária</label>
+              <select id="geral-modalidade" class="input-text">
+                <option value="Verde" selected>Verde</option>
+                <option value="Azul" disabled title="Em breve">Azul (Em breve)</option>
+              </select>
+              <span class="error-message" id="geral-modalidade-error"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUNA 2 -->
+        <div class="calc-group card" id="group-projeto">
+          <div class="calc-group-header" tabindex="0" role="button" aria-expanded="true" aria-controls="group-projeto-fields">
+            <h3>Parâmetros de Projeto</h3>
+          </div>
+          <div class="calc-group-content" id="group-projeto-fields">
+            <div class="calc-field">
+              <label for="projeto-consumo-kwh">Consumo (Energia Deslocamento) (kWh) *</label>
+              <input type="text" id="projeto-consumo-kwh" class="input-text" placeholder="Ex: 4620,0">
+              <span class="error-message" id="projeto-consumo-kwh-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="projeto-demanda-kw">Demanda Contratada (kW) *</label>
+              <input type="text" id="projeto-demanda-kw" class="input-text" placeholder="Ex: 470,0">
+              <span class="error-message" id="projeto-demanda-kw-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="projeto-dias-uteis">Dias Úteis *</label>
+              <input type="number" id="projeto-dias-uteis" class="input-text" placeholder="Ex: 22" min="1">
+              <span class="error-message" id="projeto-dias-uteis-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="projeto-ciclos-dia">Ciclos por Dia</label>
+              <input type="number" id="projeto-ciclos-dia" class="input-text" value="1" min="1">
+              <span class="error-message" id="projeto-ciclos-dia-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="projeto-hora-inicio-hp">Hora Início HP (Duração 3h)</label>
+              <input type="time" id="projeto-hora-inicio-hp" class="input-text" value="18:00">
+              <span class="error-message" id="projeto-hora-inicio-hp-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="projeto-tarifa-hp">Tarifa Ponta - HP (R$/kWh)</label>
+              <input type="text" id="projeto-tarifa-hp" class="input-text" value="2,02">
+              <span class="error-message" id="projeto-tarifa-hp-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="projeto-tarifa-fp">Tarifa Fora Ponta - FP (R$/kWh)</label>
+              <input type="text" id="projeto-tarifa-fp" class="input-text" value="0,42">
+              <span class="error-message" id="projeto-tarifa-fp-error"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUNA 3 -->
+        <div class="calc-group card" id="group-equipamento">
+          <div class="calc-group-header" tabindex="0" role="button" aria-expanded="true" aria-controls="group-equipamento-fields">
+            <h3>Parâmetros do Equipamento</h3>
+          </div>
+          <div class="calc-group-content" id="group-equipamento-fields">
+            <div class="calc-field">
+              <label for="equipamento-rte">RTE - Eficiência (%)</label>
+              <input type="text" id="equipamento-rte" class="input-text" value="90,0">
+              <span class="error-message" id="equipamento-rte-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-dod">DoD - Profundidade Descarga (%)</label>
+              <input type="text" id="equipamento-dod" class="input-text" value="90,0">
+              <span class="error-message" id="equipamento-dod-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-eol">EOL - Fim de Vida SoH (%)</label>
+              <input type="text" id="equipamento-eol" class="input-text" value="70,0">
+              <span class="error-message" id="equipamento-eol-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-ciclos">Ciclos Garantidos</label>
+              <input type="number" id="equipamento-ciclos" class="input-text" value="8000">
+              <span class="error-message" id="equipamento-ciclos-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-energia-kwh">Energia BESS Unitária (kWh)</label>
+              <input type="text" id="equipamento-energia-kwh" class="input-text" value="261,0">
+              <span class="error-message" id="equipamento-energia-kwh-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-potencia-kw">Potência BESS Unitária (kW)</label>
+              <input type="text" id="equipamento-potencia-kw" class="input-text" value="125,0">
+              <span class="error-message" id="equipamento-potencia-kw-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-modelo">Modelo do Equipamento</label>
+              <input type="text" id="equipamento-modelo" class="input-text" value="BESS 261 kWh">
+              <span class="error-message" id="equipamento-modelo-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-protecao">Tipo de Proteção</label>
+              <select id="equipamento-protecao" class="input-text">
+                <option value="ATS" selected>Chave ATS</option>
+                <option value="QGBT">Barramento QGBT</option>
+              </select>
+              <span class="error-message" id="equipamento-protecao-error"></span>
+            </div>
+
+            <div class="calc-field">
+              <label for="equipamento-perdas">Perdas do Sistema (%)</label>
+              <input type="text" id="equipamento-perdas" class="input-text" value="2,0">
+              <span class="error-message" id="equipamento-perdas-error"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botão CALCULAR -->
+      <div class="action-bar">
+        <button type="submit" id="btn-calcular" class="btn btn-primary btn-calcular">
+          CALCULAR
+        </button>
+      </div>
+    </form>
   </main>
 
   <!-- Carrega configurações locais e o client Supabase -->
@@ -36,8 +237,13 @@
   <!-- Injeta dinamicamente o App Bridge (Header e validação SSO) do Portal -->
   <script>
     (function() {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
       const bridgeScript = document.createElement('script');
-      bridgeScript.src = `${CONFIG.PORTAL_URL}assets/js/workbench-bridge.js`;
+      if (isLocal) {
+        bridgeScript.src = 'mock-bridge.js';
+      } else {
+        bridgeScript.src = `${CONFIG.PORTAL_URL}assets/js/workbench-bridge.js`;
+      }
       bridgeScript.defer = true;
       document.head.appendChild(bridgeScript);
     })();
