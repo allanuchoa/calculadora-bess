@@ -1,0 +1,27 @@
+-- ============================================================================
+-- Calculadora BESS — Migration 001: Suporte a Label / Rótulo da Simulação
+-- PRD RF09 & AGENTS.md §6.3
+-- ============================================================================
+--
+-- PROPÓSITO:
+--   Documentar e garantir que a coluna `name` da tabela `bes_simulations` atua
+--   como o rótulo (label) da simulação. 
+--   Como a tabela já foi criada em `setup.sql` contendo a coluna `name TEXT NOT NULL`,
+--   o campo `#geral-label` da UI mapeia diretamente para `name`.
+--
+-- NOTA DE COMPATIBILIDADE:
+--   Não são necessárias alterações físicas de schema (DDL) no banco de dados.
+--   Isso garante o funcionamento local em modo Standalone/Mock sem quebras.
+--   Caso futuramente o ecossistema exija uma coluna explicitamente chamada `label`,
+--   uma view ou um alias via trigger pode ser gerado:
+--   
+--   ALTER TABLE public.bes_simulations ADD COLUMN IF NOT EXISTS label TEXT;
+--   UPDATE public.bes_simulations SET label = name;
+--
+-- RLS POLICIES (Garantia de que estão ativas e usam auth.uid() = user_id):
+--   As policies bes_simulations_select, bes_simulations_insert, etc.
+--   definidas em setup.sql cobrem o controle de acesso de forma segura.
+-- ============================================================================
+
+-- Executable query to make migration runnable (Issue 12)
+SELECT 1 AS migration_success;

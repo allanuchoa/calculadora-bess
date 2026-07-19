@@ -13,6 +13,11 @@
   
   <!-- Supabase JS Client SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- jsPDF and svg2pdf.js for PDF Report Export -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.0/dist/svg2pdf.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js" defer></script>
 </head>
 <body>
 
@@ -412,6 +417,13 @@
           <div class="chart-placeholder">Clique em CALCULAR para gerar a curva de degradação da bateria (SoH).</div>
         </div>
       </section>
+    </div>
+    
+    <!-- Botão de exportação PDF do relatório completo -->
+    <div class="action-bar pdf-report__bar" style="margin-top: var(--spacing-lg); margin-bottom: var(--spacing-lg);">
+      <button type="button" id="btn-pdf-report" class="btn btn-secondary pdf-report__btn" style="display: none; width: 100%;">
+        DOWNLOAD REPORT (PDF)
+      </button>
     </div>
   </main>
 

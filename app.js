@@ -1109,12 +1109,529 @@ function generateDegradationCurve(outputs, inputs) {
 /* ====================================================================
  * SEÇÃO 7: PDF_EXPORT — Geração do relatório PDF (jsPDF + svg2pdf.js)
  * ==================================================================== */
-// (Desabilitado na Fundação / Sprint 1)
+
+// Helper to inline computed styles on cloned SVG nodes before rendering in jsPDF
+function prepareSvgForPdf(svgElement) {
+  const clone = svgElement.cloneNode(true);
+  
+  function applyStyles(original, copy) {
+    const computed = window.getComputedStyle(original);
+    const styleProps = [
+      'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-opacity',
+      'fill', 'fill-opacity',
+      'font-family', 'font-size', 'font-weight', 'text-anchor',
+      'opacity', 'display', 'visibility'
+    ];
+    
+    styleProps.forEach(prop => {
+      const val = computed.getPropertyValue(prop);
+      if (val && val !== 'none' && val !== 'normal' && val !== 'auto') {
+        copy.setAttribute(prop, val);
+      }
+    });
+    
+    for (let i = 0; i < original.children.length; i++) {
+      if (copy.children[i]) {
+        applyStyles(original.children[i], copy.children[i]);
+      }
+    }
+  }
+  
+  applyStyles(svgElement, clone);
+  
+  // Embed document stylesheets inside the clone as a <style> block to handle any foreignObject/KaTeX styles (Issue 2)
+  let cssText = "";
+  try {
+    for (const sheet of document.styleSheets) {
+      try {
+        if (sheet.cssRules) {
+          for (const rule of sheet.cssRules) {
+            cssText += rule.cssText + "\n";
+          }
+        }
+      } catch (e) {
+        // Ignora erros de CORS de fontes externas
+      }
+    }
+  } catch (e) {
+    console.warn("prepareSvgForPdf: Erro ao ler folhas de estilo:", e);
+  }
+  
+  if (cssText) {
+    const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    styleEl.textContent = cssText;
+    clone.insertBefore(styleEl, clone.firstChild);
+  }
+  
+  return clone;
+}
+
+// Normalize accented characters and remove spaces/special characters
+function sanitizeFilename(str) {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9\s-_]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
+
+async function generatePDF() {
+  const btn = document.getElementById('btn-pdf-report');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Gerando PDF...';
+  }
+  
+  try {
+    // Explicit CDN guards (Issue 11)
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      throw new Error("SDK do jsPDF não foi carregado. Verifique sua conexão à internet.");
+    }
+    if (!window.svg2pdf) {
+      throw new Error("Biblioteca svg2pdf.js não foi carregada. Verifique sua conexão à internet.");
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    // Capture from last calculated state to avoid recalculation divergence (Issue 1)
+    const inputs = lastCalculationInputs || collectInputs();
+    const outputs = lastCalculationOutputs || runCalculation(inputs);
+    
+    const dateStr = new Date().toLocaleDateString('pt-BR');
+    const userEmail = (currentSession && currentSession.user && currentSession.user.email) ? currentSession.user.email : ''; // Avoid hardcoded email fallback (Issue 3)
+    const appName = inputs['geral-aplicacao'] || 'Sem Nome';
+    
+    // ==========================================
+    // PÁGINA 1: CAPA
+    // ==========================================
+    
+    // Top primary color accent bar
+    doc.setFillColor(0, 217, 146);
+    doc.rect(0, 0, 210, 15, 'F');
+    
+    // Title / branding
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0, 217, 146);
+    doc.text("ALLAN WORKBENCH", 20, 40);
+    
+    doc.setDrawColor(61, 58, 57);
+    doc.setLineWidth(0.5);
+    doc.line(20, 45, 190, 45);
+    
+    // Main report headings
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.setTextColor(16, 16, 16);
+    doc.text("Relatório de Dimensionamento", 20, 75);
+    doc.text("Sistema BESS", 20, 87);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Estudo de Viabilidade Técnica e Econômica (Load-Shifting)", 20, 98);
+    
+    // Project info block
+    doc.setFillColor(245, 245, 245);
+    doc.rect(20, 120, 170, 75, 'F');
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(16, 16, 16);
+    doc.text("DADOS DO PROJETO", 28, 132);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text("Cliente / Aplicação:", 28, 145);
+    doc.text(appName, 70, 145);
+    
+    doc.text("Concessionária:", 28, 155);
+    doc.text(inputs['geral-concessionaria'] || '—', 70, 155);
+    
+    doc.text("Regime de Contratação:", 28, 165);
+    doc.text(inputs['geral-regime'] || '—', 70, 165);
+    
+    if (userEmail) {
+      doc.text("Responsável Técnico:", 28, 175);
+      doc.text(userEmail, 70, 175);
+      doc.text("Data de Emissão:", 28, 185);
+      doc.text(dateStr, 70, 185);
+    } else {
+      doc.text("Data de Emissão:", 28, 175);
+      doc.text(dateStr, 70, 175);
+    }
+    
+    // Cover page footer
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(140, 140, 140);
+    doc.text("Calculadora BESS v1.0 — Allan Workbench. Todos os direitos reservados.", 20, 275);
+    
+    // ==========================================
+    // PÁGINA 2: PREMISSAS E RACIONAL
+    // ==========================================
+    doc.addPage();
+    
+    // Page Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(140, 140, 140);
+    doc.text(`Simulação BESS — ${appName}`, 20, 12);
+    doc.text(dateStr, 180, 12);
+    doc.line(20, 14, 190, 14);
+    
+    // Section 1 header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(16, 16, 16);
+    doc.text("1. Premissas de Entrada", 20, 25);
+    
+    // Premises table formatting mapping UI columns 1, 2, 3
+    const bodyRows = [
+      [
+        `Nome: ${inputs['geral-label'] || '—'}\nAplicação: ${appName}\nRegime: ${inputs['geral-regime'] || '—'}\nConcessionária: ${inputs['geral-concessionaria'] || '—'}\nGrupo: ${inputs['geral-grupo-tarifario'] || '—'}\nModalidade: ${inputs['geral-modalidade'] || '—'}`,
+        `Consumo: ${formatNumber(inputs['projeto-consumo-kwh'])} kWh\nDemanda: ${formatNumber(inputs['projeto-demanda-kw'])} kW\nDias Úteis: ${inputs['projeto-dias-uteis'] || '—'}\nCiclos/Dia: ${inputs['projeto-ciclos-dia'] || '—'}\nHora Início HP: ${inputs['projeto-hora-inicio-hp'] || '—'}\nTarifa HP: R$ ${formatNumber(inputs['projeto-tarifa-hp'])}\nTarifa FP: R$ ${formatNumber(inputs['projeto-tarifa-fp'])}`,
+        `RTE: ${formatNumber(inputs['equipamento-rte'])}%\nDoD: ${formatNumber(inputs['equipamento-dod'])}%\nEOL: ${formatNumber(inputs['equipamento-eol'])}%\nCiclos: ${inputs['equipamento-ciclos'] || '—'}\nEnergia BESS: ${formatNumber(inputs['equipamento-energia-kwh'])} kWh\nPotência BESS: ${formatNumber(inputs['equipamento-potencia-kw'])} kW\nModelo: ${inputs['equipamento-modelo'] || '—'}\nProteção: ${inputs['equipamento-protecao'] || '—'}\nPerdas: ${formatNumber(inputs['equipamento-perdas'])}%`
+      ]
+    ];
+    
+    doc.autoTable({
+      head: [['Parâmetros Gerais', 'Parâmetros de Projeto', 'Parâmetros do Equipamento']],
+      body: bodyRows,
+      startY: 28,
+      theme: 'grid',
+      styles: {
+        valign: 'top',
+        fontSize: 9, // Increased from 8 to 9 for PDF legibility (Issue 10)
+        cellPadding: 4,
+        font: 'helvetica',
+        textColor: [50, 50, 50]
+      },
+      headStyles: {
+        fillColor: [0, 217, 146],
+        textColor: [16, 16, 16],
+        fontSize: 9.5,
+        fontWeight: 'bold'
+      }
+    });
+    
+    // Rationale Header
+    const rationaleY = doc.lastAutoTable.finalY + 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(16, 16, 16);
+    doc.text("2. Racional de Dimensionamento", 20, rationaleY);
+    
+    const rationaleRows = [
+      ["Energia por Ciclo (E_ciclo)", "Consumo / Dias Úteis / Ciclos por Dia", `${formatNumber(outputs.energy_per_cycle_kwh)} kWh`],
+      ["Energia Nominal Necessária", "E_ciclo / (DoD * RTE * (1 - perdas))", `${formatNumber(outputs.nominal_energy_required_kwh)} kWh`],
+      ["Quantidade de BESS (exata)", "E_nom / E_bess_unitária", `${formatNumber(outputs.bess_quantity_exact, 3)}`],
+      ["Quantidade de BESS (instalada)", "Arredondamento inteligente (threshold = 0.2)", `${outputs.bess_quantity} BESS`],
+      ["Rendimento Carga (η_carga)", "√RTE", `${formatNumber(outputs.eta_charge * 100, 2)}%`],
+      ["Rendimento Descarga (η_descarga)", "√RTE", `${formatNumber(outputs.eta_discharge * 100, 2)}%`],
+      ["Energia de Carga", "E_bess_total * DoD / η_carga", `${formatNumber(outputs.charge_energy_kwh)} kWh`],
+      ["Energia de Descarga", "E_bess_total * DoD * η_descarga", `${formatNumber(outputs.discharge_energy_kwh)} kWh`],
+      ["Energia Compensada (às cargas)", "E_descarga * η_sistema", `${formatNumber(outputs.compensated_energy_kwh)} kWh`],
+      ["Energia Consumida (da rede)", "E_carga / η_sistema", `${formatNumber(outputs.consumed_energy_kwh)} kWh`],
+      ["Custo da Carga (Fora da Ponta)", "E_consumida * Tarifa FP", `R$ ${formatNumber(outputs.cost_charge_offpeak_brl)}`],
+      ["Custo Evitado (Na Ponta)", "E_compensada * Tarifa HP", `R$ ${formatNumber(outputs.cost_avoided_peak_brl)}`],
+      ["Economia por Ciclo", "Custo Evitado - Custo Carga", `R$ ${formatNumber(outputs.savings_per_cycle_brl)}`]
+    ];
+    
+    doc.autoTable({
+      head: [['Métrica / Indicador', 'Fórmula de Referência', 'Valor Calculado']],
+      body: rationaleRows,
+      startY: rationaleY + 4,
+      theme: 'striped',
+      styles: {
+        valign: 'middle',
+        fontSize: 9, // Increased from 7.5 to 9 for PDF legibility (Issue 10)
+        cellPadding: 3,
+        font: 'helvetica',
+        textColor: [50, 50, 50]
+      },
+      headStyles: {
+        fillColor: [16, 16, 16],
+        textColor: [240, 240, 240],
+        fontSize: 9,
+        fontWeight: 'bold'
+      }
+    });
+    
+    if (outputs.bess_quantity_rounded_down) {
+      const alertY = doc.lastAutoTable.finalY + 5;
+      doc.setFillColor(254, 243, 199);
+      doc.rect(20, alertY, 170, 12, 'F');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(180, 83, 9);
+      doc.text("⚠️ Alerta de Subdimensionamento:", 24, alertY + 4.5);
+      doc.setFont("helvetica", "normal");
+      doc.text("Sistema subdimensionado. A capacidade instalada é inferior à necessária e a degradação", 24, alertY + 8);
+    }
+    
+    // ==========================================
+    // PÁGINA 3: GRÁFICOS
+    // ==========================================
+    doc.addPage();
+    
+    // Page Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(140, 140, 140);
+    doc.text(`Simulação BESS — ${appName}`, 20, 12);
+    doc.text(dateStr, 180, 12);
+    doc.line(20, 14, 190, 14);
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(16, 16, 16);
+    doc.text("3. Gráficos Operacionais e Topologia", 20, 23);
+    
+    const diagramSvg = document.querySelector("#diagram-container svg");
+    const loadCurveSvg = document.querySelector("#load-curve-container svg");
+    const unifilarSvg = document.querySelector("#unifilar-container svg");
+    const degradationSvg = document.querySelector("#degradation-container svg");
+    
+    if (diagramSvg && loadCurveSvg && unifilarSvg && degradationSvg) {
+      const preparedDiag = prepareSvgForPdf(diagramSvg);
+      const preparedLoad = prepareSvgForPdf(loadCurveSvg);
+      const preparedUni = prepareSvgForPdf(unifilarSvg);
+      const preparedDeg = prepareSvgForPdf(degradationSvg);
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(16, 16, 16);
+      
+      // Top row of charts
+      doc.text("Diagrama de Funcionamento", 20, 31);
+      doc.text("Curva de Carga 24h", 115, 31);
+      await doc.svg(preparedDiag, { x: 20, y: 33, width: 85, height: 53.1 });
+      await doc.svg(preparedLoad, { x: 115, y: 33, width: 85, height: 53.1 });
+      
+      // Bottom row of charts
+      doc.text("Diagrama Unifilar", 20, 105);
+      doc.text("Curva de Degradação (SoH)", 115, 105);
+      await doc.svg(preparedUni, { x: 25, y: 108, width: 75, height: 112.5 });
+      await doc.svg(preparedDeg, { x: 115, y: 108, width: 75, height: 112.5 });
+    } else {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(120, 120, 120);
+      doc.text("Gráficos operacionais indisponíveis para renderização.", 20, 35);
+    }
+    
+    const filename = `relatorio-bess-${sanitizeFilename(appName)}.pdf`;
+    doc.save(filename);
+    showToast("✓ Relatório PDF gerado com sucesso!", 2000);
+    
+  } catch (error) {
+    console.error("Erro ao gerar PDF:", error);
+    showToast(error.message || "Erro ao gerar PDF", 3000);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'DOWNLOAD REPORT (PDF)';
+    }
+  }
+}
 
 /* ====================================================================
  * SEÇÃO 8: SUPABASE_PERSISTENCE — Auto-save e carregamento de simulações
  * ==================================================================== */
-// (Desabilitado na Fundação / Sprint 1)
+
+let loadedSimulations = [];
+let currentSession = null;
+let lastCalculationInputs = null;
+let lastCalculationOutputs = null;
+
+function getCurrentUserId() {
+  return (currentSession && currentSession.user) ? currentSession.user.id : null;
+}
+
+// Trata o auto-save silenciosamente em background
+async function saveSimulation(inputs, outputs) {
+  const userId = getCurrentUserId();
+  if (!userId) {
+    console.log("Persistence: Usuário não logado. Auto-save pulado.");
+    return;
+  }
+  
+  const appName = inputs['geral-aplicacao'] || 'Sem Nome';
+  const timestamp = new Date().toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  const labelVal = document.getElementById('geral-label').value.trim();
+  const simulationName = labelVal || `${appName} — ${timestamp}`;
+  
+  if (userId === 'mock-user-12345') {
+    // Modo de teste local (LocalStorage) - Salva silenciosamente em background (Issue 5)
+    try {
+      let mockDb = [];
+      try {
+        mockDb = JSON.parse(localStorage.getItem('bes_simulations_mock') || '[]');
+      } catch (e) {
+        mockDb = [];
+      }
+      
+      const newSim = {
+        id: 'mock-sim-' + Date.now(),
+        user_id: userId,
+        name: simulationName,
+        inputs: inputs,
+        outputs: outputs,
+        created_at: new Date().toISOString()
+      };
+      
+      mockDb.unshift(newSim);
+      if (mockDb.length > 10) mockDb.pop();
+      
+      localStorage.setItem('bes_simulations_mock', JSON.stringify(mockDb));
+      loadedSimulations = mockDb;
+      
+      updateSimulationsDropdown(loadedSimulations, newSim.id);
+      console.log("Mock Persistence: Simulação salva localmente silenciosamente.");
+    } catch (e) {
+      console.error("Erro ao salvar simulação no mock local:", e);
+    }
+    return;
+  }
+  
+  // Produção real com Supabase
+  if (!supabase) {
+    console.warn("Supabase não disponível. Auto-save pulado.");
+    return;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('bes_simulations')
+      .insert({
+        user_id: userId,
+        name: simulationName,
+        inputs: inputs,
+        outputs: outputs
+      })
+      .select();
+      
+    if (error) {
+      console.error("Erro Supabase ao salvar simulação:", error);
+      showToast("Erro ao salvar simulação", 3000);
+    } else if (data && data[0]) {
+      console.log("Simulação salva com sucesso no Supabase:", data[0]);
+      loadedSimulations.unshift(data[0]);
+      if (loadedSimulations.length > 10) loadedSimulations.pop();
+      updateSimulationsDropdown(loadedSimulations, data[0].id);
+    }
+  } catch (err) {
+    console.error("Erro de rede ao salvar simulação no Supabase:", err);
+    showToast("Erro ao salvar simulação", 3000);
+  }
+}
+
+// Carrega as últimas 10 simulações do banco ou mock local
+async function fetchSimulations() {
+  const userId = getCurrentUserId();
+  if (!userId) return [];
+  
+  if (userId === 'mock-user-12345') {
+    try {
+      return JSON.parse(localStorage.getItem('bes_simulations_mock') || '[]');
+    } catch (e) {
+      console.error("Erro ao ler simulações do mock local:", e);
+      return [];
+    }
+  }
+  
+  if (!supabase) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('bes_simulations')
+      .select()
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+      
+    if (error) {
+      console.error("Erro ao buscar simulações no Supabase:", error);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error("Erro ao buscar simulações:", err);
+    return [];
+  }
+}
+
+// Popula o dropdown UI de simulações com os dados informados
+function updateSimulationsDropdown(simulations, activeId = '') {
+  const select = document.getElementById('simulations-select');
+  if (!select) return;
+  
+  select.innerHTML = '<option value="">Carregar simulação...</option>';
+  
+  if (simulations.length === 0) {
+    const option = document.createElement('option');
+    option.value = "";
+    option.disabled = true;
+    option.textContent = "Nenhuma simulação encontrada";
+    select.appendChild(option);
+    // Removed redundant select.style.display (Issue 8)
+    select.disabled = true;
+    return;
+  }
+  
+  simulations.forEach(sim => {
+    const option = document.createElement('option');
+    option.value = sim.id;
+    option.textContent = sim.name || `Simulação - ${new Date(sim.created_at).toLocaleDateString()}`;
+    if (sim.id === activeId) {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  });
+  
+  select.style.display = 'block';
+  select.disabled = false;
+}
+
+// Popula os campos de entrada com os dados informados
+function populateInputs(inputs) {
+  if (!inputs) return;
+  
+  for (const fieldId in FIELDS) {
+    const value = inputs[fieldId];
+    const el = document.getElementById(fieldId);
+    if (!el) continue;
+    
+    if (value !== undefined && value !== null) {
+      const rule = FIELDS[fieldId];
+      if (rule.type === 'number' || rule.type === 'percentage') {
+        let displayVal = value;
+        // Trata valores salvos como frações decimais (ex: 0.9) para escala percentual da UI (ex: 90) (Issue 4)
+        if (rule.type === 'percentage' && value <= 1 && value > 0) {
+          displayVal = value * 100;
+        }
+        el.value = displayVal.toString().replace('.', ',');
+      } else {
+        el.value = value;
+      }
+      
+      el.dispatchEvent(new Event('input'));
+    }
+  }
+}
 
 /* ====================================================================
  * SEÇÃO 9: UI — Manipulação do DOM, eventos, toast, animações
@@ -1152,6 +1669,26 @@ window.addEventListener('DOMContentLoaded', () => {
   setupResultEvents();
   cacheKatexStyles(); // Executa em background para cachear CSS do KaTeX
 
+  // Wire do dropdown de simulações
+  const select = document.getElementById('simulations-select');
+  if (select) {
+    select.addEventListener('change', (e) => {
+      const selectedId = e.target.value;
+      if (!selectedId) return;
+      
+      const found = loadedSimulations.find(sim => sim.id === selectedId);
+      if (found) {
+        populateInputs(found.inputs);
+        
+        // Dispara o cálculo submetendo o form
+        const form = document.getElementById('bess-form');
+        if (form) {
+          form.dispatchEvent(new Event('submit'));
+        }
+      }
+    });
+  }
+
   setTimeout(() => {
     if (!isAppInitialized) {
       console.log("App Bridge não respondeu em 500ms. Iniciando em modo standalone...");
@@ -1171,8 +1708,9 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Inicialização principal da aplicação
-function initApp(session) {
+async function initApp(session) {
   isAppInitialized = true;
+  currentSession = session;
   
   // Oculta o overlay de carregamento de forma suave
   const overlay = document.getElementById('loading-overlay');
@@ -1182,11 +1720,39 @@ function initApp(session) {
   }
   
   const welcomeEl = document.getElementById('user-welcome');
-  if (welcomeEl) {
-    if (session && session.user) {
+  const select = document.getElementById('simulations-select');
+  
+  if (session && session.user) {
+    if (welcomeEl) {
       welcomeEl.textContent = `Bem-vindo, ${session.user.email}!`;
-    } else {
+      welcomeEl.style.display = 'block';
+    }
+    
+    if (select) {
+      select.innerHTML = '<option value="">Carregando...</option>';
+      select.style.display = 'block';
+      select.disabled = true;
+    }
+    
+    try {
+      loadedSimulations = await fetchSimulations();
+      updateSimulationsDropdown(loadedSimulations);
+    } catch (e) {
+      console.error("Erro ao inicializar simulações:", e);
+      if (select) {
+        select.innerHTML = '<option value="">Carregar simulação...</option>';
+        select.disabled = true;
+      }
+    }
+  } else {
+    if (welcomeEl) {
       welcomeEl.textContent = `Modo Offline (Sem sincronização)`;
+      welcomeEl.style.display = 'block';
+    }
+    if (select) {
+      select.innerHTML = '<option value="">Modo Offline (Sem sincronização)</option>';
+      select.style.display = 'block';
+      select.disabled = true;
     }
   }
 }
@@ -1369,6 +1935,10 @@ function setupFormSubmit() {
           // Render results
           renderRationale(outputs);
           
+          // Guardar dados para o PDF (Issue 1)
+          lastCalculationInputs = inputs;
+          lastCalculationOutputs = outputs;
+          
           const diagramContainer = document.getElementById('diagram-container');
           if (diagramContainer) {
             diagramContainer.innerHTML = generateFlowDiagram(outputs, inputs['equipamento-protecao']);
@@ -1403,6 +1973,13 @@ function setupFormSubmit() {
             }
           });
           
+          // Exibe o botão de relatório PDF
+          const pdfBtn = document.getElementById('btn-pdf-report');
+          if (pdfBtn) {
+            pdfBtn.style.display = 'block';
+            pdfBtn.style.opacity = '1';
+          }
+          
           showToast("✓ Simulação concluída com sucesso!");
           
           if (btn) {
@@ -1415,6 +1992,10 @@ function setupFormSubmit() {
               btn.textContent = 'CALCULAR';
             }, 2000);
           }
+          
+          // Dispara o auto-save de forma assíncrona (fire-and-forget)
+          saveSimulation(inputs, outputs);
+          
         } catch (calcError) {
           console.error("Erro durante o processamento do cálculo:", calcError);
           showToast("Erro ao processar simulação. Verifique as premissas.");
@@ -1786,6 +2367,11 @@ function setupResultEvents() {
   setupExportButtons('linha-4-col1', 'btn-copy-linha-4-col1', 'btn-download-linha-4-col1', 'bess-diagrama-unifilar.svg');
   setupExportButtons('linha-4-col2', 'btn-copy-linha-4-col2', 'btn-download-linha-4-col2', 'bess-curva-degradacao.svg');
   
+  const pdfBtn = document.getElementById('btn-pdf-report');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('click', generatePDF);
+  }
+  
   const formInputs = document.querySelectorAll('#bess-form input, #bess-form select');
   const sectionsToDim = ['linha-2', 'linha-3-col1', 'linha-3-col2', 'linha-4-col1', 'linha-4-col2'];
   formInputs.forEach(el => {
@@ -1796,6 +2382,9 @@ function setupResultEvents() {
           sec.style.opacity = '0.5';
         }
       });
+      if (pdfBtn && pdfBtn.style.display !== 'none') {
+        pdfBtn.style.opacity = '0.5';
+      }
     });
   });
 }
