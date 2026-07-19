@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora BESS - Allan Workbench</title>
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Fontes Oficiais -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono&display=swap" rel="stylesheet">
+  
+  <!-- Supabase JS Client SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body style="display: none;">
+
+  <!-- Layout Container Base -->
+  <main class="container">
+    <div class="card" style="max-width: 600px; margin: 40px auto;">
+      <h2 style="color: var(--color-primary); margin-bottom: var(--spacing-md);">Calculadora BESS</h2>
+      <p id="user-welcome" style="margin-bottom: var(--spacing-lg);">Carregando autenticação...</p>
+      
+      <div style="display: flex; gap: var(--spacing-sm);">
+        <button class="btn btn-primary" onclick="alert('Ação primária executada!')">Ação Principal</button>
+        <button class="btn btn-secondary" onclick="alert('Ação secundária!')">Ação Secundária</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Carrega configurações locais e o client Supabase -->
+  <script src="config.js"></script>
+  <script src="supabase.js"></script>
+  
+  <!-- Injeta dinamicamente o App Bridge (Header e validação SSO) do Portal -->
+  <script>
+    (function() {
+      const bridgeScript = document.createElement('script');
+      bridgeScript.src = `${CONFIG.PORTAL_URL}assets/js/workbench-bridge.js`;
+      bridgeScript.defer = true;
+      document.head.appendChild(bridgeScript);
+    })();
+  </script>
+  
+  <!-- Script de lógica de negócios -->
+  <script src="app.js"></script>
+</body>
+</html>
