@@ -333,7 +333,84 @@
             </button>
           </div>
         </div>
-        <div class="svg-container" id="diagram-container"></div>
+        <div class="svg-container" id="diagram-container">
+          <div class="chart-placeholder">Clique em CALCULAR para gerar o diagrama de funcionamento.</div>
+        </div>
+      </section>
+
+      <!-- Coluna 2: Curva de Carga 24h -->
+      <section id="linha-3-col2" class="result-section card" style="display: none;" role="region" aria-label="Curva de Carga 24h" aria-live="polite">
+        <div class="result-section-header">
+          <h2>Curva de Carga 24h</h2>
+          <div class="btn-group export-bar">
+            <button type="button" class="btn btn-icon" id="btn-copy-linha-3-col2" title="Copiar como PNG" aria-label="Copiar curva de carga 24h como PNG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn btn-icon" id="btn-download-linha-3-col2" title="Baixar como SVG" aria-label="Baixar curva de carga 24h como SVG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="svg-container" id="load-curve-container">
+          <div class="chart-placeholder">Clique em CALCULAR para visualizar a curva de carga de 24h.</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- LINHA 4: DIAGRAMA UNIFILAR E CURVA DE DEGRADAÇÃO -->
+    <div class="grid-two-cols" style="margin-top: var(--spacing-md);">
+      <!-- Coluna 1: Diagrama Unifilar -->
+      <section id="linha-4-col1" class="result-section card" style="display: none;" role="region" aria-label="Diagrama Unifilar" aria-live="polite">
+        <div class="result-section-header">
+          <h2>Diagrama Unifilar</h2>
+          <div class="btn-group export-bar">
+            <button type="button" class="btn btn-icon" id="btn-copy-linha-4-col1" title="Copiar como PNG" aria-label="Copiar diagrama unifilar como PNG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col1" title="Baixar como SVG" aria-label="Baixar diagrama unifilar como SVG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="svg-container" id="unifilar-container">
+          <div class="chart-placeholder">Clique em CALCULAR para gerar o diagrama unifilar elétrico.</div>
+        </div>
+      </section>
+
+      <!-- Coluna 2: Curva de Degradação -->
+      <section id="linha-4-col2" class="result-section card" style="display: none;" role="region" aria-label="Curva de Degradação" aria-live="polite">
+        <div class="result-section-header">
+          <h2>Curva de Degradação</h2>
+          <div class="btn-group export-bar">
+            <button type="button" class="btn btn-icon" id="btn-copy-linha-4-col2" title="Copiar como PNG" aria-label="Copiar curva de degradação como PNG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col2" title="Baixar como SVG" aria-label="Baixar curva de degradação como SVG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="svg-container" id="degradation-container">
+          <div class="chart-placeholder">Clique em CALCULAR para gerar a curva de degradação da bateria (SoH).</div>
+        </div>
       </section>
     </div>
   </main>

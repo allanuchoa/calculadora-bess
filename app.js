@@ -207,6 +207,61 @@ function clearAllErrors() {
  * SEÇÃO 2: CALCULATIONS — Motor de cálculo (fórmulas do AGENTS.md §2)
  * ==================================================================== */
 
+const LOAD_PROFILE = [
+  0.70, 0.72, 0.70, 0.72, 0.68, 0.65, // 0h-5h: patamar noturno
+  0.68, 0.70, 0.80, 0.88, 0.92, 0.95, // 6h-11h: rampa matinal
+  0.97, 1.00, 0.98, 0.95, 0.95, 0.95, // 12h-17h: pico e patamar
+  0.95, 0.92, 0.88, 0.82, 0.78, 0.73  // 18h-23h: queda noturna
+];
+
+const DEGRADATION_TABLE = {
+  '0.5P': [100.0, 95.0, 92.8, 90.9, 89.1, 87.5, 85.9, 84.4, 82.9, 81.4, 80.0, 78.6, 77.3, 76.0, 74.7, 73.4],
+  '0.25P': [100.0, 95.3, 93.1, 91.2, 89.4, 87.8, 86.2, 84.7, 83.2, 81.7, 80.3, 78.9, 77.6, 76.3, 75.0, 73.7]
+};
+
+function linearInterpolate(arr, year) {
+  const idx = Math.floor(year);
+  if (idx >= arr.length - 1) return arr[arr.length - 1];
+  if (idx < 0) return arr[0];
+  const frac = year - idx;
+  return arr[idx] + frac * (arr[idx + 1] - arr[idx]);
+}
+
+function getSoH(cRate, year, cyclesPerDay) {
+  let soh_base = 100;
+  if (cRate === '0.5P') {
+    soh_base = linearInterpolate(DEGRADATION_TABLE['0.5P'], year);
+  } else if (cRate === '0.25P') {
+    soh_base = linearInterpolate(DEGRADATION_TABLE['0.25P'], year);
+  } else if (cRate === '0.1C') {
+    const soh_025P = linearInterpolate(DEGRADATION_TABLE['0.25P'], year);
+    const degradacao_025P = 100 - soh_025P;
+    const degradacao_01C = degradacao_025P * 0.85; // 15% menos degradação
+    soh_base = 100 - degradacao_01C;
+  }
+  
+  const degradacao_base = 100 - soh_base;
+  // Separar degradação calendárica (40%) e cíclica (60%) escalada por ciclos/dia
+  const degradacao_calendario = degradacao_base * 0.4;
+  const degradacao_ciclica = degradacao_base * 0.6 * cyclesPerDay;
+  
+  return Math.max(0, 100 - degradacao_calendario - degradacao_ciclica);
+}
+
+function calcDegradationCurves(cyclesPerDay, eolPercent) {
+  const curves = {
+    '0.5P': [],
+    '0.25P': [],
+    '0.1C': []
+  };
+  for (let year = 0; year <= 15; year++) {
+    curves['0.5P'].push(getSoH('0.5P', year, cyclesPerDay));
+    curves['0.25P'].push(getSoH('0.25P', year, cyclesPerDay));
+    curves['0.1C'].push(getSoH('0.1C', year, cyclesPerDay));
+  }
+  return curves;
+}
+
 function getEfficiencyConstants(rtePercent, systemLossesPercent) {
   const rte = rtePercent / 100;
   const perdas = systemLossesPercent / 100;
@@ -331,11 +386,7 @@ function runCalculation(inputs) {
     dod_percent: dodPercent,
     rte_percent: rtePercent,
     system_losses_percent: systemLossesPercent,
-    degradation_curves: {
-      '0.5P': [],
-      '0.25P': [],
-      '0.1C': []
-    }
+    degradation_curves: calcDegradationCurves(cyclesPerDay, inputs['equipamento-eol'])
   };
 }
 
@@ -345,7 +396,7 @@ function runCalculation(inputs) {
 
 // Função auxiliar global para formatar números no padrão brasileiro (pt-BR)
 function formatNumber(val, decimals = 2) {
-  if (val === undefined || val === null || isNaN(val)) return '0,00';
+  if (val === undefined || val === null || isNaN(val) || !Number.isFinite(val)) return '0,00';
   return val.toLocaleString('pt-BR', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
@@ -442,17 +493,618 @@ function generateFlowDiagram(outputs, protectionType) {
 /* ====================================================================
  * SEÇÃO 4: SVG_LOAD_CURVE — Geração do gráfico de curva de carga 24h
  * ==================================================================== */
-// (Desabilitado na Fundação / Sprint 1)
+
+function generateLoadCurve(outputs, inputs) {
+  const rootStyles = getComputedStyle(document.documentElement);
+  const colorPrimary = rootStyles.getPropertyValue('--color-primary').trim() || '#00d992';
+  const colorMute = rootStyles.getPropertyValue('--color-mute').trim() || '#8b949e';
+  const colorInkStrong = rootStyles.getPropertyValue('--color-ink-strong').trim() || '#ffffff';
+  
+  const contracted_demand_kw = inputs['projeto-demanda-kw'] || 470.0;
+  
+  const baseLoad = [];
+  for (let h = 0; h < 24; h++) {
+    baseLoad.push(LOAD_PROFILE[h] * contracted_demand_kw);
+  }
+  
+  const startHP = parseInt(outputs.peak_hours.start.split(':')[0], 10);
+  const endHP = (startHP + 3) % 24;
+  
+  function isHP(h) {
+    return endHP > startHP ? (h >= startHP && h < startHP + 3) : (h >= startHP || h < endHP);
+  }
+
+  // 1. Coletar horas fora do HP e ordená-las por demanda (carga base) crescente
+  const nonHPHours = [];
+  for (let h = 0; h < 24; h++) {
+    if (!isHP(h)) {
+      nonHPHours.push({ hour: h, demand: baseLoad[h] });
+    }
+  }
+  nonHPHours.sort((a, b) => a.demand - b.demand);
+
+  // 2. Determinar N (duração da carga): ~5-6h ou mais se a potência do BESS for limitante
+  const minHoursRequired = Math.ceil(outputs.consumed_energy_kwh / outputs.total_bess_power_kw);
+  const N = Math.min(Math.max(6, minHoursRequired), nonHPHours.length);
+
+  // 3. Selecionar as primeiras N horas com menor demanda
+  const chargeHoursSet = new Set();
+  for (let i = 0; i < N; i++) {
+    chargeHoursSet.add(nonHPHours[i].hour);
+  }
+
+  const P_carga = outputs.consumed_energy_kwh / N;
+  const P_descarga = outputs.discharge_energy_kwh / 3;
+
+  const loadRede = [];
+  for (let h = 0; h < 24; h++) {
+    let p = baseLoad[h];
+    if (isHP(h)) {
+      p -= P_descarga;
+    } else if (chargeHoursSet.has(h)) {
+      p += P_carga;
+    }
+    loadRede.push(p);
+  }
+
+  const maxP = Math.max(...baseLoad, ...loadRede);
+  const maxY = Math.max(10, Math.ceil(maxP * 1.15 / 50) * 50);
+
+  const w = 800;
+  const h_svg = 450;
+  const padL = 70;
+  const padR = 40;
+  const padT = 50;
+  const padB = 60;
+  const chartW = w - padL - padR;
+  const chartH = h_svg - padT - padB;
+
+  function getX(hour) {
+    return padL + (hour / 24) * chartW;
+  }
+  function getY(power) {
+    if (Number.isNaN(power) || !Number.isFinite(power)) return padT + chartH;
+    return padT + chartH - (power / maxY) * chartH;
+  }
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h_svg}`);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.style.background = 'transparent';
+  svg.style.fontFamily = "'Inter', system-ui, sans-serif";
+
+  // HP Highlight Rect
+  const hpGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  if (endHP > startHP) {
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', getX(startHP));
+    rect.setAttribute('y', padT);
+    rect.setAttribute('width', getX(startHP + 3) - getX(startHP));
+    rect.setAttribute('height', chartH);
+    rect.setAttribute('class', 'load-curve__hp-zone');
+    hpGroup.appendChild(rect);
+  } else {
+    const rect1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect1.setAttribute('x', getX(startHP));
+    rect1.setAttribute('y', padT);
+    rect1.setAttribute('width', getX(24) - getX(startHP));
+    rect1.setAttribute('height', chartH);
+    rect1.setAttribute('class', 'load-curve__hp-zone');
+    hpGroup.appendChild(rect1);
+
+    const rect2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect2.setAttribute('x', getX(0));
+    rect2.setAttribute('y', padT);
+    rect2.setAttribute('width', getX(endHP) - getX(0));
+    rect2.setAttribute('height', chartH);
+    rect2.setAttribute('class', 'load-curve__hp-zone');
+    hpGroup.appendChild(rect2);
+  }
+  svg.appendChild(hpGroup);
+
+  // Gridlines & Ticks Y
+  const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const tickCountY = 5;
+  for (let i = 0; i <= tickCountY; i++) {
+    const val = (maxY / tickCountY) * i;
+    const y = getY(val);
+    
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', padL);
+    line.setAttribute('y1', y);
+    line.setAttribute('x2', w - padR);
+    line.setAttribute('y2', y);
+    line.setAttribute('class', 'load-curve__grid');
+    gridGroup.appendChild(line);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', padL - 10);
+    text.setAttribute('y', y + 4);
+    text.setAttribute('text-anchor', 'end');
+    text.setAttribute('class', 'load-curve__label');
+    text.textContent = formatNumber(val, 0) + ' kW';
+    gridGroup.appendChild(text);
+  }
+
+  // Ticks X (De 2 em 2 horas)
+  for (let h = 0; h <= 24; h += 2) {
+    const x = getX(h);
+    
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x);
+    line.setAttribute('y1', padT);
+    line.setAttribute('x2', x);
+    line.setAttribute('y2', padT + chartH);
+    line.setAttribute('class', 'load-curve__grid');
+    gridGroup.appendChild(line);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', x);
+    text.setAttribute('y', padT + chartH + 18);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('class', 'load-curve__label');
+    text.textContent = `${h}h`;
+    gridGroup.appendChild(text);
+  }
+
+  // Centered X-axis label "Hora (h)" (Recommendation 2)
+  const xAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  xAxisLabel.setAttribute('x', padL + chartW / 2);
+  xAxisLabel.setAttribute('y', padT + chartH + 34);
+  xAxisLabel.setAttribute('text-anchor', 'middle');
+  xAxisLabel.setAttribute('class', 'load-curve__label');
+  xAxisLabel.setAttribute('font-weight', 'bold');
+  xAxisLabel.textContent = 'Hora (h)';
+  gridGroup.appendChild(xAxisLabel);
+
+  svg.appendChild(gridGroup);
+
+  // Area: BESS Charge (Blue) hour-by-hour polygon path
+  chargeHoursSet.forEach(h => {
+    const chargeArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const topStart = loadRede[h];
+    const topEnd = chargeHoursSet.has((h + 1) % 24) ? loadRede[(h + 1) % 24] : baseLoad[(h + 1) % 24];
+    const d = `M ${getX(h)} ${getY(baseLoad[h])} ` +
+              `L ${getX(h)} ${getY(topStart)} ` +
+              `L ${getX(h + 1)} ${getY(topEnd)} ` +
+              `L ${getX(h + 1)} ${getY(baseLoad[(h + 1) % 24])} Z`;
+    chargeArea.setAttribute('d', d);
+    chargeArea.setAttribute('fill', '#3b82f6');
+    chargeArea.setAttribute('fill-opacity', '0.25');
+    svg.appendChild(chargeArea);
+  });
+
+  // Area: BESS Discharge (Amber)
+  const dischargeArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  let dischargeD = `M ${getX(startHP)} ${getY(baseLoad[startHP])}`;
+  for (let h = startHP; h <= startHP + 3; h++) {
+    const hr = h % 24;
+    const val = h === startHP + 3 ? baseLoad[hr] : (baseLoad[hr] - P_descarga);
+    dischargeD += ` L ${getX(h)} ${getY(val)}`;
+  }
+  for (let h = startHP + 3; h >= startHP; h--) {
+    const hr = h % 24;
+    dischargeD += ` L ${getX(h)} ${getY(baseLoad[hr])}`;
+  }
+  dischargeD += ' Z';
+  dischargeArea.setAttribute('d', dischargeD);
+  dischargeArea.setAttribute('fill', '#f59e0b');
+  dischargeArea.setAttribute('fill-opacity', '0.3');
+  svg.appendChild(dischargeArea);
+
+  // Curve: Base Load - Primary Green Line (Recommendation 8)
+  const baseLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  let baseD = `M ${getX(0)} ${getY(baseLoad[0])}`;
+  for (let h = 1; h <= 24; h++) {
+    baseD += ` L ${getX(h)} ${getY(baseLoad[h % 24])}`;
+  }
+  baseLine.setAttribute('d', baseD);
+  baseLine.setAttribute('fill', 'none');
+  baseLine.setAttribute('stroke', colorPrimary);
+  baseLine.setAttribute('stroke-width', '2.5');
+  baseLine.setAttribute('class', 'load-curve__curve');
+  svg.appendChild(baseLine);
+
+  // Curve: Grid Load (Rede + BESS) (Recommendation 8)
+  const gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  let gridD = `M ${getX(0)} ${getY(loadRede[0])}`;
+  for (let h = 1; h <= 24; h++) {
+    gridD += ` L ${getX(h)} ${getY(loadRede[h % 24])}`;
+  }
+  gridLine.setAttribute('d', gridD);
+  gridLine.setAttribute('fill', 'none');
+  gridLine.setAttribute('stroke', '#a78bfa');
+  gridLine.setAttribute('stroke-dasharray', '4 3');
+  gridLine.setAttribute('stroke-width', '2.0');
+  gridLine.setAttribute('class', 'load-curve__curve');
+  svg.appendChild(gridLine);
+
+  // Cost Annotations
+  // Encontrar uma das horas de carga representativas para a anotação
+  const chargeAnnHour = [...chargeHoursSet].sort((a,b) => a-b)[Math.floor(N/2)] || 3;
+  const chargeAnn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  chargeAnn.setAttribute('x', getX(chargeAnnHour));
+  chargeAnn.setAttribute('y', getY(baseLoad[chargeAnnHour] + P_carga) - 12);
+  chargeAnn.setAttribute('text-anchor', 'middle');
+  chargeAnn.setAttribute('fill', '#60a5fa');
+  chargeAnn.setAttribute('font-size', '10');
+  chargeAnn.setAttribute('font-weight', 'bold');
+  chargeAnn.textContent = `Carga FP: R$ ${formatNumber(outputs.cost_charge_offpeak_brl, 2)}`;
+  svg.appendChild(chargeAnn);
+
+  const dischargeAnn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  const midHP = startHP + 1.5;
+  dischargeAnn.setAttribute('x', getX(midHP));
+  dischargeAnn.setAttribute('y', getY(baseLoad[Math.floor(midHP) % 24] - P_descarga) + 20);
+  dischargeAnn.setAttribute('text-anchor', 'middle');
+  dischargeAnn.setAttribute('fill', '#fbbf24');
+  dischargeAnn.setAttribute('font-size', '10');
+  dischargeAnn.setAttribute('font-weight', 'bold');
+  dischargeAnn.textContent = `Evitado HP: R$ ${formatNumber(outputs.cost_avoided_peak_brl, 2)}`;
+  svg.appendChild(dischargeAnn);
+
+  const hpLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  hpLabel.setAttribute('x', getX(midHP));
+  hpLabel.setAttribute('y', padT - 10);
+  hpLabel.setAttribute('text-anchor', 'middle');
+  hpLabel.setAttribute('fill', '#fca5a5');
+  hpLabel.setAttribute('font-size', '10');
+  hpLabel.setAttribute('font-weight', '600');
+  hpLabel.textContent = 'Horário de Ponta';
+  svg.appendChild(hpLabel);
+
+  const yAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  yAxisLabel.setAttribute('transform', 'rotate(-90)');
+  yAxisLabel.setAttribute('x', -(padT + chartH / 2));
+  yAxisLabel.setAttribute('y', padL - 48);
+  yAxisLabel.setAttribute('text-anchor', 'middle');
+  yAxisLabel.setAttribute('fill', colorMute);
+  yAxisLabel.setAttribute('font-size', '10');
+  yAxisLabel.textContent = 'Potência (kW)';
+  svg.appendChild(yAxisLabel);
+
+  // Legend Group inside the SVG (Problem 3)
+  const legendGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  legendGroup.setAttribute('transform', 'translate(0, 430)');
+
+  const legendItems = [
+    { label: 'Rede Base', color: colorPrimary, type: 'line' },
+    { label: 'Rede com BESS', color: '#a78bfa', type: 'dashed-line' },
+    { label: 'Carga BESS (FP)', color: '#3b82f6', type: 'rect', opacity: 0.25 },
+    { label: 'Descarga BESS (HP)', color: '#f59e0b', type: 'rect', opacity: 0.3 },
+    { label: 'Horário de Ponta', color: '#ef4444', type: 'rect', opacity: 0.12 }
+  ];
+
+  let currentX = 50;
+  legendItems.forEach(item => {
+    if (item.type === 'line') {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', currentX);
+      line.setAttribute('y1', -4);
+      line.setAttribute('x2', currentX + 15);
+      line.setAttribute('y2', -4);
+      line.setAttribute('stroke', item.color);
+      line.setAttribute('stroke-width', '2.5');
+      legendGroup.appendChild(line);
+    } else if (item.type === 'dashed-line') {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', currentX);
+      line.setAttribute('y1', -4);
+      line.setAttribute('x2', currentX + 15);
+      line.setAttribute('y2', -4);
+      line.setAttribute('stroke', item.color);
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-dasharray', '4 3');
+      legendGroup.appendChild(line);
+    } else if (item.type === 'rect') {
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', currentX);
+      rect.setAttribute('y', -10);
+      rect.setAttribute('width', 15);
+      rect.setAttribute('height', 12);
+      rect.setAttribute('rx', 2);
+      rect.setAttribute('fill', item.color);
+      rect.setAttribute('fill-opacity', item.opacity);
+      legendGroup.appendChild(rect);
+    }
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', currentX + 22);
+    text.setAttribute('y', 0);
+    text.setAttribute('fill', colorMute);
+    text.setAttribute('font-size', '11');
+    text.textContent = item.label;
+    legendGroup.appendChild(text);
+
+    currentX += item.label.length * 6 + 45;
+  });
+  svg.appendChild(legendGroup);
+
+  return svg;
+}
 
 /* ====================================================================
  * SEÇÃO 5: SVG_UNIFILAR — Geração do diagrama unifilar
  * ==================================================================== */
-// (Desabilitado na Fundação / Sprint 1)
+
+function generateUnifilar(outputs, inputs) {
+  const rootStyles = getComputedStyle(document.documentElement);
+  const colorPrimary = rootStyles.getPropertyValue('--color-primary').trim() || '#00d992';
+  const colorMute = rootStyles.getPropertyValue('--color-mute').trim() || '#8b949e';
+  
+  const protectionType = inputs['equipamento-protecao'] || 'ATS';
+  const protectionLabel = (protectionType === 'ATS') ? 'Chave ATS' : 'Barramento QGBT';
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="100%" height="100%" style="background: transparent; font-family: 'Inter', system-ui, sans-serif;">
+  <!-- Rede Concessionária -->
+  <g class="unifilar-group">
+    <circle cx="200" cy="40" r="15" fill="#1a1a1a" stroke="var(--color-primary)" stroke-width="2" />
+    <path d="M 193 40 L 207 40 M 200 33 L 200 47" stroke="var(--color-primary)" stroke-width="2" />
+    <text x="200" y="72" text-anchor="middle" class="unifilar__text-primary">⚡ Rede Concessionária</text>
+  </g>
+
+  <!-- AC Line: Rede -> Medidor -->
+  <line x1="200" y1="78" x2="200" y2="120" class="unifilar__line unifilar__line-ac" />
+
+  <!-- Medidor -->
+  <g class="unifilar-group">
+    <rect x="150" y="120" width="100" height="50" rx="4" class="unifilar__node" />
+    <text x="200" y="140" text-anchor="middle" class="unifilar__text-primary">Medidor</text>
+    <text x="200" y="158" text-anchor="middle" class="unifilar__text-secondary">Medidor Inteligente</text>
+  </g>
+
+  <!-- AC Line: Medidor -> Proteção -->
+  <line x1="200" y1="170" x2="200" y2="220" class="unifilar__line unifilar__line-ac" />
+
+  <!-- ATS / QGBT -->
+  <g class="unifilar-group">
+    <rect x="130" y="220" width="140" height="60" rx="6" class="unifilar__node" />
+    <text x="200" y="244" text-anchor="middle" class="unifilar__text-primary">${protectionLabel}</text>
+    <text x="200" y="264" text-anchor="middle" class="unifilar__text-secondary">Ponto Conexão</text>
+  </g>
+
+  <!-- AC Line Left: Proteção -> Cargas -->
+  <path d="M 200 280 L 200 310 L 90 310 L 90 360" class="unifilar__line unifilar__line-ac" />
+
+  <!-- AC Line Right: Proteção -> PCS -->
+  <path d="M 200 280 L 200 310 L 310 310 L 310 360" class="unifilar__line unifilar__line-ac" />
+
+  <!-- Cargas C&I -->
+  <g class="unifilar-group">
+    <rect x="40" y="360" width="100" height="60" rx="6" class="unifilar__node" />
+    <text x="90" y="386" text-anchor="middle" class="unifilar__text-primary">Cargas C&I</text>
+    <text x="90" y="404" text-anchor="middle" class="unifilar__text-secondary">Consumo Inst.</text>
+  </g>
+
+  <!-- PCS (Inversor Bidirecional) -->
+  <g class="unifilar-group">
+    <rect x="260" y="360" width="100" height="60" rx="6" class="unifilar__node" />
+    <text x="310" y="386" text-anchor="middle" class="unifilar__text-primary">PCS (Inversor)</text>
+    <text x="310" y="404" text-anchor="middle" class="unifilar__text-secondary">Bidirecional</text>
+  </g>
+
+  <!-- DC Line: PCS -> Bateria -->
+  <line x1="310" y1="420" x2="310" y2="480" class="unifilar__line unifilar__line-dc" />
+  <text x="325" y="455" fill="var(--color-dc-line)" font-size="10" font-weight="bold">Barramento CC</text>
+
+  <!-- Bateria LFP -->
+  <g class="unifilar-group">
+    <rect x="260" y="480" width="100" height="60" rx="6" class="unifilar__node" />
+    <text x="310" y="506" text-anchor="middle" class="unifilar__text-primary">Bateria LFP</text>
+    <text x="310" y="524" text-anchor="middle" class="unifilar__text-secondary">${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</text>
+  </g>
+
+  <!-- EMS (Gerenciador de Energia) -->
+  <g class="unifilar-group">
+    <rect x="40" y="480" width="100" height="60" rx="6" class="unifilar__node" />
+    <text x="90" y="506" text-anchor="middle" class="unifilar__text-primary">Controlador EMS</text>
+    <text x="90" y="524" text-anchor="middle" class="unifilar__text-secondary">Gestão Local</text>
+  </g>
+
+  <!-- Communication Line (Dashed) -->
+  <path d="M 90 480 L 90 440 L 310 440" class="unifilar__line unifilar__line-comm" />
+  <path d="M 90 440 L 90 250 L 130 250" class="unifilar__line unifilar__line-comm" />
+  <text x="145" y="435" fill="var(--color-comm-line)" font-size="9" font-style="italic">Modbus TCP / RS485</text>
+</svg>
+  `;
+  return svg.trim();
+}
 
 /* ====================================================================
  * SEÇÃO 6: SVG_DEGRADATION — Geração do gráfico de degradação
  * ==================================================================== */
-// (Desabilitado na Fundação / Sprint 1)
+
+function generateDegradationCurve(outputs, inputs) {
+  const rootStyles = getComputedStyle(document.documentElement);
+  const colorPrimary = rootStyles.getPropertyValue('--color-primary').trim() || '#00d992';
+  const colorMute = rootStyles.getPropertyValue('--color-mute').trim() || '#8b949e';
+
+  const curves = outputs.degradation_curves;
+  const eolPercent = inputs['equipamento-eol'] || 70.0;
+  const cyclesPerDay = inputs['projeto-ciclos-dia'] || 1;
+
+  const minSoH = Math.min(...curves['0.5P'], ...curves['0.25P'], ...curves['0.1C']);
+  const minY = Math.max(0, Math.floor(Math.min(minSoH, eolPercent) / 10) * 10 - 10);
+
+  const w = 800;
+  const h_svg = 400;
+  const padL = 60;
+  const padR = 40;
+  const padT = 40;
+  const padB = 75; // Adjusted to leave space for the inline legend
+  const chartW = w - padL - padR;
+  const chartH = h_svg - padT - padB;
+
+  function getX(yr) {
+    return padL + (yr / 15) * chartW;
+  }
+  function getY(soh) {
+    if (Number.isNaN(soh) || !Number.isFinite(soh)) return padT + chartH;
+    return padT + chartH - ((soh - minY) / (100 - minY)) * chartH;
+  }
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h_svg}`);
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.style.background = 'transparent';
+  svg.style.fontFamily = "'Inter', system-ui, sans-serif";
+
+  // Grid Y
+  const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const startTick = Math.ceil(minY / 10) * 10;
+  for (let val = startTick; val <= 100; val += 10) {
+    const y = getY(val);
+    
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', padL);
+    line.setAttribute('y1', y);
+    line.setAttribute('x2', w - padR);
+    line.setAttribute('y2', y);
+    line.setAttribute('class', 'degradation__grid');
+    gridGroup.appendChild(line);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', padL - 10);
+    text.setAttribute('y', y + 4);
+    text.setAttribute('text-anchor', 'end');
+    text.setAttribute('class', 'degradation__label');
+    text.textContent = `${val}%`;
+    gridGroup.appendChild(text);
+  }
+
+  // Grid X & Labels
+  for (let yr = 0; yr <= 15; yr += 5) {
+    const x = getX(yr);
+    
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x);
+    line.setAttribute('y1', padT);
+    line.setAttribute('x2', x);
+    line.setAttribute('y2', padT + chartH);
+    line.setAttribute('class', 'degradation__grid');
+    gridGroup.appendChild(line);
+
+    const textYr = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    textYr.setAttribute('x', x);
+    textYr.setAttribute('y', padT + chartH + 18);
+    textYr.setAttribute('text-anchor', 'middle');
+    textYr.setAttribute('class', 'degradation__label');
+    textYr.setAttribute('font-weight', 'bold');
+    textYr.textContent = `Ano ${yr}`;
+    gridGroup.appendChild(textYr);
+
+    const textCyc = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    textCyc.setAttribute('x', x);
+    textCyc.setAttribute('y', padT + chartH + 30);
+    textCyc.setAttribute('text-anchor', 'middle');
+    textCyc.setAttribute('class', 'degradation__label');
+    const cycles = Math.round(yr * 365 * cyclesPerDay);
+    textCyc.textContent = `(${formatNumber(cycles, 0)} cic)`;
+    gridGroup.appendChild(textCyc);
+  }
+  svg.appendChild(gridGroup);
+
+  // EOL Line
+  const eolY = getY(eolPercent);
+  const eolLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  eolLine.setAttribute('x1', padL);
+  eolLine.setAttribute('y1', eolY);
+  eolLine.setAttribute('x2', w - padR);
+  eolLine.setAttribute('y2', eolY);
+  eolLine.setAttribute('class', 'degradation__eol-line');
+  svg.appendChild(eolLine);
+
+  const eolText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  eolText.setAttribute('x', w - padR - 5);
+  eolText.setAttribute('y', eolY - 6);
+  eolText.setAttribute('text-anchor', 'end');
+  eolText.setAttribute('fill', '#8b5cf6');
+  eolText.setAttribute('font-size', '10');
+  eolText.setAttribute('font-weight', 'bold');
+  eolText.textContent = `EOL: ${formatNumber(eolPercent, 1)}%`;
+  svg.appendChild(eolText);
+
+  // Curves
+  const cRates = ['0.5P', '0.25P', '0.1C'];
+  const colors = {
+    '0.5P': '#ef4444',
+    '0.25P': '#f59e0b',
+    '0.1C': colorPrimary
+  };
+  
+  cRates.forEach(rate => {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    let d = `M ${getX(0)} ${getY(curves[rate][0])}`;
+    for (let yr = 1; yr <= 15; yr++) {
+      d += ` L ${getX(yr)} ${getY(curves[rate][yr])}`;
+    }
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'degradation__curve');
+    path.setAttribute('stroke', colors[rate]);
+    svg.appendChild(path);
+  });
+
+  const yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  yLabel.setAttribute('transform', 'rotate(-90)');
+  yLabel.setAttribute('x', -(padT + chartH / 2));
+  yLabel.setAttribute('y', padL - 42);
+  yLabel.setAttribute('text-anchor', 'middle');
+  yLabel.setAttribute('fill', colorMute);
+  yLabel.setAttribute('font-size', '10');
+  yLabel.textContent = 'Estado de Saúde (SoH %)';
+  svg.appendChild(yLabel);
+
+  // Legend Group inside the SVG (Problem 3)
+  const legendGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  legendGroup.setAttribute('transform', 'translate(0, 382)');
+
+  const legendItems = [
+    { label: '0.1C (Extrapolado)', color: colors['0.1C'], type: 'line' },
+    { label: '0.25P (Datasheet)', color: colors['0.25P'], type: 'line' },
+    { label: '0.5P (Datasheet)', color: colors['0.5P'], type: 'line' },
+    { label: 'Limite EOL', color: '#8b5cf6', type: 'dashed-line' }
+  ];
+
+  let currentX = 60;
+  legendItems.forEach(item => {
+    if (item.type === 'line') {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', currentX);
+      line.setAttribute('y1', -4);
+      line.setAttribute('x2', currentX + 15);
+      line.setAttribute('y2', -4);
+      line.setAttribute('stroke', item.color);
+      line.setAttribute('stroke-width', '2.5');
+      legendGroup.appendChild(line);
+    } else if (item.type === 'dashed-line') {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', currentX);
+      line.setAttribute('y1', -4);
+      line.setAttribute('x2', currentX + 15);
+      line.setAttribute('y2', -4);
+      line.setAttribute('stroke', item.color);
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-dasharray', '4 4');
+      legendGroup.appendChild(line);
+    }
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', currentX + 22);
+    text.setAttribute('y', 0);
+    text.setAttribute('fill', colorMute);
+    text.setAttribute('font-size', '11');
+    text.textContent = item.label;
+    legendGroup.appendChild(text);
+
+    currentX += item.label.length * 6 + 40;
+  });
+  svg.appendChild(legendGroup);
+
+  return svg;
+}
 
 /* ====================================================================
  * SEÇÃO 7: PDF_EXPORT — Geração do relatório PDF (jsPDF + svg2pdf.js)
@@ -676,11 +1328,17 @@ function setupFormSubmit() {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       
-      // Restaurar opacidade instantaneamente ao re-calcular (Recomendação 6)
       const l2 = document.getElementById('linha-2');
       const l3 = document.getElementById('linha-3-col1');
+      const l3_c2 = document.getElementById('linha-3-col2');
+      const l4_c1 = document.getElementById('linha-4-col1');
+      const l4_c2 = document.getElementById('linha-4-col2');
+      
       if (l2) l2.style.opacity = '1';
       if (l3) l3.style.opacity = '1';
+      if (l3_c2) l3_c2.style.opacity = '1';
+      if (l4_c1) l4_c1.style.opacity = '1';
+      if (l4_c2) l4_c2.style.opacity = '1';
       
       const isValid = validateInputs();
       
@@ -693,13 +1351,11 @@ function setupFormSubmit() {
           btn.textContent = 'Calculando...';
         }
         
-        // Collect inputs & execute the sizing engine
         const inputs = collectInputs();
         
         try {
           const outputs = runCalculation(inputs);
           
-          // Defensive check for NaN or Infinity (Task 5.5)
           if (hasInvalidValues(outputs)) {
             console.warn("Aviso: Os outputs contêm valores inválidos (NaN/Infinity). Evitando renderização.", outputs);
             showToast("Erro: Valores inválidos nos cálculos. Verifique os dados de entrada.");
@@ -717,26 +1373,38 @@ function setupFormSubmit() {
           if (diagramContainer) {
             diagramContainer.innerHTML = generateFlowDiagram(outputs, inputs['equipamento-protecao']);
           }
+
+          const loadCurveContainer = document.getElementById('load-curve-container');
+          if (loadCurveContainer) {
+            loadCurveContainer.innerHTML = '';
+            loadCurveContainer.appendChild(generateLoadCurve(outputs, inputs));
+          }
+
+          const unifilarContainer = document.getElementById('unifilar-container');
+          if (unifilarContainer) {
+            unifilarContainer.innerHTML = generateUnifilar(outputs, inputs);
+          }
+
+          const degradationContainer = document.getElementById('degradation-container');
+          if (degradationContainer) {
+            degradationContainer.innerHTML = '';
+            degradationContainer.appendChild(generateDegradationCurve(outputs, inputs));
+          }
           
           // Reveal result containers with slide-down animation and reset opacity (PRD §3.3)
-          if (l2) {
-            l2.classList.remove('slide-down');
-            void l2.offsetWidth; // Force layout reflow (Risco 6)
-            l2.style.display = 'block';
-            l2.style.opacity = '1';
-            l2.classList.add('slide-down');
-          }
-          if (l3) {
-            l3.classList.remove('slide-down');
-            void l3.offsetWidth; // Force layout reflow (Risco 6)
-            l3.style.display = 'block';
-            l3.style.opacity = '1';
-            l3.classList.add('slide-down');
-          }
+          const sectionsToReveal = [l2, l3, l3_c2, l4_c1, l4_c2];
+          sectionsToReveal.forEach(sec => {
+            if (sec) {
+              sec.classList.remove('slide-down');
+              void sec.offsetWidth; // Force layout reflow
+              sec.style.display = 'block';
+              sec.style.opacity = '1';
+              sec.classList.add('slide-down');
+            }
+          });
           
           showToast("✓ Simulação concluída com sucesso!");
           
-          // Efeito visual de sucesso no botão de calcular (Recomendação 9)
           if (btn) {
             btn.disabled = false;
             btn.classList.add('validated');
@@ -1001,13 +1669,12 @@ function getLinha2SvgString() {
   return svg.trim();
 }
 
-// copyToClipboard function drawing SVG/HTML onto Canvas and copying PNG to clipboard (Task 5.3)
 function copyToClipboard(sectionId) {
   let svgString = "";
   if (sectionId === 'linha-2') {
     svgString = getLinha2SvgString();
-  } else if (sectionId === 'linha-3-col1') {
-    const svgEl = document.querySelector('#linha-3-col1 svg');
+  } else {
+    const svgEl = document.querySelector(`#${sectionId} svg`);
     if (!svgEl) return;
     svgString = new XMLSerializer().serializeToString(svgEl);
   }
@@ -1023,6 +1690,18 @@ function copyToClipboard(sectionId) {
     const el = document.querySelector('#linha-2 .rationale-grid');
     width = el ? (el.offsetWidth || 1200) : 1200;
     height = el ? (el.offsetHeight || 400) : 400;
+  } else {
+    const svgEl = document.querySelector(`#${sectionId} svg`);
+    if (svgEl) {
+      const viewBox = svgEl.getAttribute('viewBox');
+      if (viewBox) {
+        const parts = viewBox.split(/\s+/).map(Number);
+        if (parts.length === 4) {
+          width = parts[2];
+          height = parts[3];
+        }
+      }
+    }
   }
   
   const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -1035,7 +1714,7 @@ function copyToClipboard(sectionId) {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, width, height); // Keep transparent background (Task 2.7)
+    ctx.clearRect(0, 0, width, height); // Keep transparent background
     ctx.drawImage(img, 0, 0);
     
     canvas.toBlob((blob) => {
@@ -1062,19 +1741,14 @@ function copyToClipboard(sectionId) {
   img.src = blobURL;
 }
 
-// downloadSvg triggers browser to download result representation as pure vector SVG (Task 5.3)
-function downloadSvg(sectionId) {
+function downloadSvg(sectionId, filename) {
   let svgString = "";
-  let filename = "bess-diagrama-funcionamento.svg";
-  
   if (sectionId === 'linha-2') {
     svgString = getLinha2SvgString();
-    filename = "bess-racional-dimensionamento.svg";
-  } else if (sectionId === 'linha-3-col1') {
-    const svgEl = document.querySelector('#linha-3-col1 svg');
+  } else {
+    const svgEl = document.querySelector(`#${sectionId} svg`);
     if (!svgEl) return;
     svgString = new XMLSerializer().serializeToString(svgEl);
-    filename = "bess-diagrama-funcionamento.svg";
   }
   
   if (!svgString) {
@@ -1086,37 +1760,42 @@ function downloadSvg(sectionId) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = filename || "bess-export.svg";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// Wire Sprint 2 outputs actions (Task 5.3)
+function setupExportButtons(sectionId, copyBtnId, downloadBtnId, filename) {
+  const copyBtn = document.getElementById(copyBtnId);
+  const downloadBtn = document.getElementById(downloadBtnId);
+  
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => copyToClipboard(sectionId));
+  }
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => downloadSvg(sectionId, filename));
+  }
+}
+
 function setupResultEvents() {
-  const btnCopyL2 = document.getElementById('btn-copy-linha-2');
-  const btnDownloadL2 = document.getElementById('btn-download-linha-2');
-  const btnCopyL3 = document.getElementById('btn-copy-linha-3');
-  const btnDownloadL3 = document.getElementById('btn-download-linha-3');
+  setupExportButtons('linha-2', 'btn-copy-linha-2', 'btn-download-linha-2', 'bess-racional-dimensionamento.svg');
+  setupExportButtons('linha-3-col1', 'btn-copy-linha-3', 'btn-download-linha-3', 'bess-diagrama-funcionamento.svg');
+  setupExportButtons('linha-3-col2', 'btn-copy-linha-3-col2', 'btn-download-linha-3-col2', 'bess-curva-carga-24h.svg');
+  setupExportButtons('linha-4-col1', 'btn-copy-linha-4-col1', 'btn-download-linha-4-col1', 'bess-diagrama-unifilar.svg');
+  setupExportButtons('linha-4-col2', 'btn-copy-linha-4-col2', 'btn-download-linha-4-col2', 'bess-curva-degradacao.svg');
   
-  if (btnCopyL2) btnCopyL2.addEventListener('click', () => copyToClipboard('linha-2'));
-  if (btnDownloadL2) btnDownloadL2.addEventListener('click', () => downloadSvg('linha-2'));
-  if (btnCopyL3) btnCopyL3.addEventListener('click', () => copyToClipboard('linha-3-col1'));
-  if (btnDownloadL3) btnDownloadL3.addEventListener('click', () => downloadSvg('linha-3-col1'));
-  
-  // Real-time opacity fade when input is modified (PRD §3.3)
   const formInputs = document.querySelectorAll('#bess-form input, #bess-form select');
+  const sectionsToDim = ['linha-2', 'linha-3-col1', 'linha-3-col2', 'linha-4-col1', 'linha-4-col2'];
   formInputs.forEach(el => {
     el.addEventListener('input', () => {
-      const l2 = document.getElementById('linha-2');
-      const l3 = document.getElementById('linha-3-col1');
-      if (l2 && l2.style.display !== 'none') {
-        l2.style.opacity = '0.5';
-      }
-      if (l3 && l3.style.display !== 'none') {
-        l3.style.opacity = '0.5';
-      }
+      sectionsToDim.forEach(id => {
+        const sec = document.getElementById(id);
+        if (sec && sec.style.display !== 'none') {
+          sec.style.opacity = '0.5';
+        }
+      });
     });
   });
 }

@@ -620,9 +620,9 @@ body {
   gap: var(--spacing-md);
 }
 
-@media (max-width: 1024px) {
+@media (min-width: 1025px) {
   .grid-two-cols {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -655,5 +655,118 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+/* Calculadora BESS - Sprint 3 Chart Styles */
+.load-curve__grid, .degradation__grid {
+  stroke: var(--color-hairline);
+  stroke-dasharray: 2 2;
+  opacity: 0.5;
+}
+
+.load-curve__label, .degradation__label {
+  fill: var(--color-mute);
+  font-family: var(--font-sans);
+  font-size: 10px;
+}
+
+.load-curve__title, .degradation__title {
+  fill: var(--color-ink-strong);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.load-curve__hp-zone {
+  fill: #ef4444;
+  fill-opacity: 0.12;
+}
+
+.unifilar__node {
+  fill: #1a1a1a;
+  stroke: var(--color-hairline);
+  stroke-width: 2;
+  transition: all 0.2s ease-in-out;
+}
+
+.unifilar__node:hover {
+  stroke: var(--color-primary);
+  fill: #222222;
+}
+
+.unifilar__text-primary {
+  fill: var(--color-ink-strong);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.unifilar__text-secondary {
+  fill: var(--color-mute);
+  font-family: var(--font-sans);
+  font-size: 10px;
+}
+
+:root {
+  --color-ac-line: #ef4444;
+  --color-dc-line: #3b82f6;
+  --color-comm-line: #8b949e;
+}
+
+.unifilar__line {
+  fill: none;
+  stroke-width: 3;
+}
+
+.unifilar__line-ac {
+  stroke: var(--color-ac-line);
+}
+
+.unifilar__line-dc {
+  stroke: var(--color-dc-line);
+}
+
+.unifilar__line-comm {
+  stroke: var(--color-comm-line);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.load-curve__curve {
+  fill: none;
+  transition: stroke-width 0.2s ease;
+}
+
+.load-curve__curve:hover {
+  stroke-width: 4;
+}
+
+.degradation__curve {
+  fill: none;
+  stroke-width: 2.5;
+  transition: stroke-width 0.2s ease;
+}
+
+.degradation__curve:hover {
+  stroke-width: 4;
+}
+
+.degradation__eol-line {
+  stroke: #8b5cf6;
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+}
+
+.chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-mute);
+  font-size: 13px;
+  font-style: italic;
+  padding: var(--spacing-lg) var(--spacing-md);
+  text-align: center;
+}
+
 
 
