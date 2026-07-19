@@ -29,10 +29,11 @@ function getSupabaseClient() {
   return supabaseClientInstance;
 }
 
-// Inicializa a instância global se possível, mas de forma segura
-let supabase = null;
+// Inicializa a instância global se possível, mas de forma segura.
+// Nome distinto de "supabase" para não colidir com o namespace global do SDK (CDN UMD).
+let supabaseDb = null;
 try {
-  supabase = getSupabaseClient();
+  supabaseDb = getSupabaseClient();
 } catch (e) {
   console.warn("Erro ao instanciar o Supabase globalmente:", e);
 }

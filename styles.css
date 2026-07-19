@@ -493,33 +493,6 @@ body {
   margin-bottom: var(--spacing-xs);
 }
 
-.katex-zone {
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  overflow-x: auto;
-  padding: var(--spacing-xs) 0;
-}
-
-.math-substitution {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-mute);
-  text-align: center;
-  word-break: break-all;
-  margin-bottom: var(--spacing-xs);
-}
-
-.math-result {
-  font-size: 14px;
-  font-weight: 500;
-  text-align: center;
-  color: var(--color-ink-strong);
-  margin-bottom: var(--spacing-xs);
-}
-
 .bess-qty-container {
   display: flex;
   justify-content: center;
@@ -537,16 +510,6 @@ body {
   border: 1px solid rgba(0, 217, 146, 0.2);
 }
 
-.warning-label {
-  background-color: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
-  padding: var(--spacing-sm);
-  border-radius: var(--rounded-sm);
-  font-size: 12px;
-  line-height: 1.4;
-  text-align: left;
-}
 
 .energy-flow-list, .economic-list {
   list-style: none;
@@ -596,24 +559,6 @@ body {
   text-shadow: 0 0 10px rgba(0, 217, 146, 0.2);
 }
 
-.svg-container {
-  width: 100%;
-  overflow-x: auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: var(--color-canvas-soft);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-md);
-  padding: var(--spacing-md);
-}
-
-.svg-container svg {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
 .grid-two-cols {
   display: grid;
   grid-template-columns: 1fr;
@@ -642,118 +587,13 @@ body {
   }
 }
 
-/* Fallback do KaTeX em caso de falha de CDN */
-.katex-fallback {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--color-ink-strong);
-  text-align: center;
-  word-break: break-all;
-  padding: var(--spacing-xs) 0;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 /* Calculadora BESS - Sprint 3 Chart Styles */
-.load-curve__grid, .degradation__grid {
-  stroke: var(--color-hairline);
-  stroke-dasharray: 2 2;
-  opacity: 0.5;
-}
-
-.load-curve__label, .degradation__label {
-  fill: var(--color-mute);
-  font-family: var(--font-sans);
-  font-size: 10px;
-}
-
-.load-curve__title, .degradation__title {
-  fill: var(--color-ink-strong);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.load-curve__hp-zone {
-  fill: #ef4444;
-  fill-opacity: 0.12;
-}
-
-.unifilar__node {
-  fill: #1a1a1a;
-  stroke: var(--color-hairline);
-  stroke-width: 2;
-  transition: all 0.2s ease-in-out;
-}
-
-.unifilar__node:hover {
-  stroke: var(--color-primary);
-  fill: #222222;
-}
-
-.unifilar__text-primary {
-  fill: var(--color-ink-strong);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.unifilar__text-secondary {
-  fill: var(--color-mute);
-  font-family: var(--font-sans);
-  font-size: 10px;
-}
 
 :root {
   --color-ac-line: #ef4444;
   --color-dc-line: #3b82f6;
   --color-comm-line: #8b949e;
-}
-
-.unifilar__line {
-  fill: none;
-  stroke-width: 3;
-}
-
-.unifilar__line-ac {
-  stroke: var(--color-ac-line);
-}
-
-.unifilar__line-dc {
-  stroke: var(--color-dc-line);
-}
-
-.unifilar__line-comm {
-  stroke: var(--color-comm-line);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 4;
-}
-
-.load-curve__curve {
-  fill: none;
-  transition: stroke-width 0.2s ease;
-}
-
-.load-curve__curve:hover {
-  stroke-width: 4;
-}
-
-.degradation__curve {
-  fill: none;
-  stroke-width: 2.5;
-  transition: stroke-width 0.2s ease;
-}
-
-.degradation__curve:hover {
-  stroke-width: 4;
-}
-
-.degradation__eol-line {
-  stroke: #8b5cf6;
-  stroke-dasharray: 4 4;
-  stroke-width: 1.5;
 }
 
 .chart-placeholder {
@@ -811,5 +651,466 @@ body {
   cursor: not-allowed;
 }
 
+/* Calculadora BESS */
+/* ====================================================================
+ * Sprint 5 — Dashboard Premium: cards de racional, diagramas HTML/CSS,
+ * containers ApexCharts, banners de alerta e conectores elétricos
+ * ==================================================================== */
 
+/* --- Containers de gráficos e diagramas --- */
+.chart-container,
+.diagram-container {
+  width: 100%;
+  background-color: var(--color-canvas-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-md);
+  padding: var(--spacing-md);
+  min-height: 220px;
+}
 
+.diagram-container {
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+}
+
+/* --- Racional do Cálculo (Linha 2) --- */
+.formula-badge {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--color-primary);
+  background-color: rgba(0, 217, 146, 0.06);
+  border: 1px solid rgba(0, 217, 146, 0.2);
+  border-radius: var(--rounded-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: center;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.formula-substitution {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-mute);
+  text-align: center;
+  word-break: break-word;
+}
+
+.metric-hero {
+  font-family: var(--font-sans);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-ink-strong);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  background-color: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-left: 3px solid #f59e0b;
+  color: #fbbf24;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--rounded-sm);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.alert-banner__icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* --- Nós dos diagramas (.node-card) --- */
+.node-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background-color: var(--color-canvas-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  min-width: 150px;
+  text-align: center;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.node-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 14px rgba(0, 217, 146, 0.08);
+  transform: translateY(-1px);
+}
+
+.node-card__icon {
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.node-card__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-ink-strong);
+  line-height: 1.3;
+}
+
+.node-card__sub {
+  font-size: 10.5px;
+  color: var(--color-mute);
+  line-height: 1.3;
+}
+
+.node-card--grid {
+  border-color: rgba(0, 217, 146, 0.55);
+}
+
+.node-card--accent {
+  border-color: var(--color-mute);
+  background-color: #1f1f1f;
+}
+
+.node-card--bess {
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.node-card--bess:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.12);
+}
+
+.node-card--comm {
+  border-style: dashed;
+}
+
+/* --- Diagrama de Funcionamento (fluxo de energia) --- */
+.flow-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-sm);
+  width: 100%;
+  min-width: 640px;
+  padding: var(--spacing-sm);
+}
+
+.flow-diagram__top {
+  display: flex;
+  justify-content: center;
+}
+
+.flow-vertical {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.flow-vertical__line {
+  width: 3px;
+  height: 56px;
+  border-radius: 2px;
+  background-color: var(--color-primary);
+  position: relative;
+}
+
+.flow-vertical__line::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--color-primary);
+}
+
+.flow-vertical__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.flow-diagram__middle {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.flow-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--spacing-xs);
+  min-width: 130px;
+}
+
+.flow-connector .flow-value {
+  white-space: nowrap;
+}
+
+.flow-connector--dual {
+  gap: var(--spacing-md);
+}
+
+.flow-channel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.flow-line {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  margin: 3px 0;
+}
+
+.flow-line--amber { background-color: #f59e0b; }
+.flow-line--blue { background-color: #3b82f6; }
+
+.flow-line--right::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 8px solid currentColor;
+}
+
+.flow-line--left::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 8px solid currentColor;
+}
+
+.flow-line--amber.flow-line--left,
+.flow-line--amber.flow-line--right { color: #f59e0b; }
+
+.flow-line--blue.flow-line--left,
+.flow-line--blue.flow-line--right { color: #3b82f6; }
+
+.flow-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.flow-value {
+  font-size: 11px;
+  color: var(--color-ink-strong);
+  line-height: 1.35;
+  text-align: center;
+}
+
+.flow-value code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-body);
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: var(--rounded-xs);
+  padding: 0 3px;
+}
+
+.flow-sub {
+  font-size: 10px;
+  color: var(--color-mute);
+  line-height: 1.3;
+  text-align: center;
+}
+
+.flow-text--green { color: var(--color-primary); }
+.flow-text--amber { color: #f59e0b; }
+.flow-text--blue { color: #60a5fa; }
+
+.flow-diagram__caption {
+  margin-top: var(--spacing-sm);
+  text-align: center;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--color-mute);
+}
+
+/* --- Diagrama Unifilar --- */
+.unifilar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 520px;
+  padding: var(--spacing-sm);
+}
+
+.uni-wire {
+  width: 3px;
+  height: 26px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.uni-wire--tall { height: 34px; }
+
+.uni-wire--ac { background-color: var(--color-ac-line); }
+.uni-wire--dc { background-color: var(--color-dc-line); }
+
+.uni-wire--comm {
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-comm-line) 0 4px,
+    transparent 4px 8px
+  );
+  width: 2px;
+}
+
+.uni-branch {
+  width: min(400px, 85%);
+  height: 22px;
+  border-top: 3px solid var(--color-ac-line);
+  border-left: 3px solid var(--color-ac-line);
+  border-right: 3px solid var(--color-ac-line);
+  border-radius: var(--rounded-xs) var(--rounded-xs) 0 0;
+}
+
+.uni-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  width: min(460px, 100%);
+}
+
+.uni-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.uni-wire-labeled {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.uni-wire-label {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.uni-text--dc { color: var(--color-dc-line); }
+
+.uni-comm-link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: min(400px, 85%);
+  margin-top: var(--spacing-md);
+}
+
+.uni-comm-link__line {
+  flex: 1;
+  height: 0;
+  border-top: 2px dashed var(--color-comm-line);
+}
+
+.uni-comm-link__label {
+  font-size: 10px;
+  font-style: italic;
+  color: var(--color-comm-line);
+  white-space: nowrap;
+}
+
+.uni-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-md) var(--spacing-lg);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-hairline);
+  width: 100%;
+}
+
+.uni-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 10.5px;
+  color: var(--color-mute);
+}
+
+.uni-legend__swatch {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.uni-legend__swatch--ac { background-color: var(--color-ac-line); }
+.uni-legend__swatch--dc { background-color: var(--color-dc-line); }
+
+.uni-legend__swatch--comm {
+  background: repeating-linear-gradient(
+    to right,
+    var(--color-comm-line) 0 4px,
+    transparent 4px 7px
+  );
+}
+
+/* --- Ajustes ApexCharts (tema Energy Dark) --- */
+.chart-container .apexcharts-canvas {
+  margin: 0 auto;
+}
+
+.chart-container .apexcharts-tooltip {
+  background: var(--color-canvas-soft) !important;
+  border: 1px solid var(--color-hairline) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45) !important;
+}
+
+.chart-container .apexcharts-legend-text {
+  color: var(--color-mute) !important;
+}
+
+/* --- Responsividade dos diagramas --- */
+@media (max-width: 767px) {
+  .flow-diagram {
+    min-width: 560px;
+  }
+
+  .unifilar {
+    max-width: 100%;
+  }
+
+  .uni-row {
+    gap: var(--spacing-sm);
+  }
+
+  .node-card {
+    min-width: 120px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .metric-hero {
+    font-size: 1.5rem;
+  }
+}

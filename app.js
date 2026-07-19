@@ -391,7 +391,7 @@ function runCalculation(inputs) {
 }
 
 /* ====================================================================
- * SEÇÃO 3: SVG_CHARTS — Geração do diagrama de funcionamento BESS
+ * SEÇÃO 3: FLOW_DIAGRAM — Diagrama de funcionamento BESS em HTML/CSS
  * ==================================================================== */
 
 // Função auxiliar global para formatar números no padrão brasileiro (pt-BR)
@@ -403,113 +403,116 @@ function formatNumber(val, decimals = 2) {
   });
 }
 
-function generateFlowDiagram(outputs, protectionType) {
-  // Resolve theme colors dynamically using document styles to ensure exact dark-theme coherence
-  const rootStyles = getComputedStyle(document.documentElement);
-  const colorPrimary = rootStyles.getPropertyValue('--color-primary').trim() || '#00d992';
-  const colorMute = rootStyles.getPropertyValue('--color-mute').trim() || '#8b949e';
-  const colorInkStrong = rootStyles.getPropertyValue('--color-ink-strong').trim() || '#ffffff';
-  
+// Registro global das instâncias ApexCharts (para export e re-render)
+const bessCharts = {
+  loadCurve: null,
+  degradation: null
+};
+
+// Renderiza o diagrama de fluxo de energia com nós HTML (.node-card) e conectores CSS
+function renderFlowDiagram(container, outputs, protectionType) {
+  if (!container) return;
+
   const protectionLabel = (protectionType === 'ATS') ? 'Chave ATS' : 'Barramento QGBT';
-  
+
   const E_consumida = formatNumber(outputs.consumed_energy_kwh);
   const E_carga = formatNumber(outputs.charge_energy_kwh);
   const E_descarga = formatNumber(outputs.discharge_energy_kwh);
   const E_compensada = formatNumber(outputs.compensated_energy_kwh);
-  
+
   const eta_charge = formatNumber(outputs.eta_charge * 100, 2);
   const eta_discharge = formatNumber(outputs.eta_discharge * 100, 2);
   const eta_system = formatNumber(outputs.eta_system * 100, 1);
   const lossPercent = formatNumber((1 - outputs.eta_system) * 100, 1);
-  
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%" style="background: transparent; font-family: 'Inter', system-ui, sans-serif;">
-  <defs>
-    <!-- Arrow heads -->
-    <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="${colorPrimary}" />
-    </marker>
-    <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" />
-    </marker>
-    <marker id="arrow-amber" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
-    </marker>
-  </defs>
 
-  <!-- Rede Concessionaria Block -->
-  <rect x="300" y="30" width="200" height="70" rx="8" fill="#1a1a1a" stroke="${colorPrimary}" stroke-width="2" />
-  <text x="400" y="65" text-anchor="middle" fill="${colorInkStrong}" font-size="14" font-weight="bold">Rede Concessionária</text>
-  <text x="400" y="85" text-anchor="middle" fill="${colorMute}" font-size="11">AC 3Φ</text>
+  container.innerHTML = `
+    <div class="flow-diagram" id="flow-diagram-capture">
+      <div class="flow-diagram__top">
+        <div class="node-card node-card--grid">
+          <span class="node-card__icon" aria-hidden="true">⚡</span>
+          <span class="node-card__title">Rede Concessionária</span>
+          <span class="node-card__sub">AC 3Φ</span>
+        </div>
+      </div>
 
-  <!-- Central Switch/Busbar Block (ATS / QGBT) -->
-  <rect x="300" y="210" width="200" height="80" rx="8" fill="#1a1a1a" stroke="${colorMute}" stroke-width="2" />
-  <text x="400" y="245" text-anchor="middle" fill="${colorInkStrong}" font-size="14" font-weight="bold">${protectionLabel}</text>
-  <text x="400" y="265" text-anchor="middle" fill="${colorMute}" font-size="11">Ponto de Conexão Comum</text>
+      <div class="flow-vertical">
+        <div class="flow-vertical__line"></div>
+        <div class="flow-vertical__info">
+          <span class="flow-label flow-text--green">Carga (Fora de Ponta)</span>
+          <span class="flow-value"><code>E_consumida</code> = ${E_consumida} kWh</span>
+          <span class="flow-sub">Inclui perdas de conexão (${lossPercent}%)</span>
+        </div>
+      </div>
 
-  <!-- Cargas C&I Block -->
-  <rect x="40" y="215" width="180" height="70" rx="8" fill="#1a1a1a" stroke="${colorMute}" stroke-width="2" />
-  <text x="130" y="250" text-anchor="middle" fill="${colorInkStrong}" font-size="14" font-weight="bold">Cargas C&I</text>
-  <text x="130" y="270" text-anchor="middle" fill="${colorMute}" font-size="11">Consumo Industrial</text>
+      <div class="flow-diagram__middle">
+        <div class="node-card node-card--loads">
+          <span class="node-card__icon" aria-hidden="true">🏭</span>
+          <span class="node-card__title">Cargas C&amp;I</span>
+          <span class="node-card__sub">Consumo Industrial</span>
+        </div>
 
-  <!-- BESS Block -->
-  <rect x="580" y="215" width="180" height="70" rx="8" fill="#1a1a1a" stroke="#3b82f6" stroke-width="2" />
-  <text x="670" y="250" text-anchor="middle" fill="${colorInkStrong}" font-size="14" font-weight="bold">BESS (Baterias LFP)</text>
-  <text x="670" y="270" text-anchor="middle" fill="${colorMute}" font-size="11">Capacidade: ${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</text>
+        <div class="flow-connector">
+          <span class="flow-label flow-text--amber">Alimentação (HP)</span>
+          <div class="flow-line flow-line--amber flow-line--left"></div>
+          <span class="flow-value"><code>E_compensada</code> = ${E_compensada} kWh</span>
+          <span class="flow-sub">Rendimento: ${eta_system}%</span>
+        </div>
 
-  <!-- FLOW PATHS & LABELS -->
-  
-  <!-- 1. Rede -> ATS/QGBT (Carga - FP) -->
-  <path d="M 400 100 L 400 200" fill="none" stroke="${colorPrimary}" stroke-width="3" marker-end="url(#arrow-green)" />
-  <text x="415" y="140" fill="${colorPrimary}" font-size="12" font-weight="bold">Carga (Fora de Ponta)</text>
-  <text x="415" y="160" fill="${colorInkStrong}" font-size="11">E<sub>consumida</sub> = ${E_consumida} kWh</text>
-  <text x="415" y="175" fill="${colorMute}" font-size="10">Inclui perdas de conexão (${lossPercent}%)</text>
+        <div class="node-card node-card--accent">
+          <span class="node-card__icon" aria-hidden="true">🔀</span>
+          <span class="node-card__title">${protectionLabel}</span>
+          <span class="node-card__sub">Ponto de Conexão Comum</span>
+        </div>
 
-  <!-- 2. ATS/QGBT -> BESS (Carga - FP) - Top horizontal path -->
-  <path d="M 500 235 L 570 235" fill="none" stroke="#3b82f6" stroke-width="3" marker-end="url(#arrow-blue)" />
-  <text x="535" y="195" text-anchor="middle" fill="#3b82f6" font-size="12" font-weight="bold">Carga BESS</text>
-  <text x="535" y="210" text-anchor="middle" fill="${colorInkStrong}" font-size="11">E<sub>carga</sub> = ${E_carga} kWh</text>
-  <text x="535" y="222" text-anchor="middle" fill="${colorMute}" font-size="10">η<sub>carga</sub> = ${eta_charge}%</text>
+        <div class="flow-connector flow-connector--dual">
+          <div class="flow-channel">
+            <span class="flow-label flow-text--blue">Carga BESS</span>
+            <div class="flow-line flow-line--blue flow-line--right"></div>
+            <span class="flow-value"><code>E_carga</code> = ${E_carga} kWh</span>
+            <span class="flow-sub">η_carga = ${eta_charge}%</span>
+          </div>
+          <div class="flow-channel">
+            <span class="flow-label flow-text--amber">Descarga (HP)</span>
+            <div class="flow-line flow-line--amber flow-line--left"></div>
+            <span class="flow-value"><code>E_descarga</code> = ${E_descarga} kWh</span>
+            <span class="flow-sub">η_descarga = ${eta_discharge}%</span>
+          </div>
+        </div>
 
-  <!-- 3. BESS -> ATS/QGBT (Descarga - HP) - Bottom horizontal path -->
-  <path d="M 580 265 L 510 265" fill="none" stroke="#f59e0b" stroke-width="3" marker-end="url(#arrow-amber)" />
-  <text x="535" y="285" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="bold">Descarga</text>
-  <text x="535" y="300" text-anchor="middle" fill="${colorInkStrong}" font-size="11">E<sub>descarga</sub> = ${E_descarga} kWh</text>
-  <text x="535" y="312" text-anchor="middle" fill="${colorMute}" font-size="10">η<sub>descarga</sub> = ${eta_discharge}%</text>
+        <div class="node-card node-card--bess">
+          <span class="node-card__icon" aria-hidden="true">🔋</span>
+          <span class="node-card__title">BESS (Baterias LFP)</span>
+          <span class="node-card__sub">Capacidade: ${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</span>
+        </div>
+      </div>
 
-  <!-- 4. ATS/QGBT -> Cargas C&I (Descarga - HP) -->
-  <path d="M 300 250 L 230 250" fill="none" stroke="#f59e0b" stroke-width="3" marker-end="url(#arrow-amber)" />
-  <text x="265" y="215" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="bold">Alimentação</text>
-  <text x="265" y="230" text-anchor="middle" fill="${colorInkStrong}" font-size="11">E<sub>compensada</sub> = ${E_compensada} kWh</text>
-  <text x="265" y="242" text-anchor="middle" fill="${colorMute}" font-size="10">Rendimento: ${eta_system}%</text>
-
-  <!-- System info label in background -->
-  <text x="400" y="450" text-anchor="middle" fill="${colorMute}" font-size="11" font-style="italic">Diagrama de Fluxo de Energia por Ciclo (Load-Shifting)</text>
-</svg>
+      <div class="flow-diagram__caption">Diagrama de Fluxo de Energia por Ciclo (Load-Shifting)</div>
+    </div>
   `;
-  return svg.trim();
 }
 
 /* ====================================================================
- * SEÇÃO 4: SVG_LOAD_CURVE — Geração do gráfico de curva de carga 24h
+ * SEÇÃO 4: LOAD_CURVE_CHART — Curva de carga 24h com ApexCharts
  * ==================================================================== */
 
-function generateLoadCurve(outputs, inputs) {
+function renderLoadCurve(container, outputs, inputs) {
+  if (!container || typeof ApexCharts === 'undefined') return;
+
   const rootStyles = getComputedStyle(document.documentElement);
   const colorPrimary = rootStyles.getPropertyValue('--color-primary').trim() || '#00d992';
   const colorMute = rootStyles.getPropertyValue('--color-mute').trim() || '#8b949e';
-  const colorInkStrong = rootStyles.getPropertyValue('--color-ink-strong').trim() || '#ffffff';
-  
+  const colorHairline = rootStyles.getPropertyValue('--color-hairline').trim() || '#3d3a39';
+
   const contracted_demand_kw = inputs['projeto-demanda-kw'] || 470.0;
-  
+
   const baseLoad = [];
   for (let h = 0; h < 24; h++) {
     baseLoad.push(LOAD_PROFILE[h] * contracted_demand_kw);
   }
-  
+
   const startHP = parseInt(outputs.peak_hours.start.split(':')[0], 10);
   const endHP = (startHP + 3) % 24;
-  
+
   function isHP(h) {
     return endHP > startHP ? (h >= startHP && h < startHP + 3) : (h >= startHP || h < endHP);
   }
@@ -536,634 +539,406 @@ function generateLoadCurve(outputs, inputs) {
   const P_carga = outputs.consumed_energy_kwh / N;
   const P_descarga = outputs.discharge_energy_kwh / 3;
 
-  const loadRede = [];
-  for (let h = 0; h < 24; h++) {
-    let p = baseLoad[h];
-    if (isHP(h)) {
+  const baseSeries = [];
+  const gridSeries = [];
+  for (let h = 0; h <= 24; h++) {
+    const hr = h % 24;
+    let p = baseLoad[hr];
+    if (isHP(hr)) {
       p -= P_descarga;
-    } else if (chargeHoursSet.has(h)) {
+    } else if (chargeHoursSet.has(hr)) {
       p += P_carga;
     }
-    loadRede.push(p);
+    baseSeries.push([h, Math.round(baseLoad[hr] * 100) / 100]);
+    gridSeries.push([h, Math.round(p * 100) / 100]);
   }
 
-  const maxP = Math.max(...baseLoad, ...loadRede);
-  const maxY = Math.max(10, Math.ceil(maxP * 1.15 / 50) * 50);
-
-  const w = 800;
-  const h_svg = 450;
-  const padL = 70;
-  const padR = 40;
-  const padT = 50;
-  const padB = 60;
-  const chartW = w - padL - padR;
-  const chartH = h_svg - padT - padB;
-
-  function getX(hour) {
-    return padL + (hour / 24) * chartW;
-  }
-  function getY(power) {
-    if (Number.isNaN(power) || !Number.isFinite(power)) return padT + chartH;
-    return padT + chartH - (power / maxY) * chartH;
-  }
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', `0 0 ${w} ${h_svg}`);
-  svg.setAttribute('width', '100%');
-  svg.setAttribute('height', '100%');
-  svg.style.background = 'transparent';
-  svg.style.fontFamily = "'Inter', system-ui, sans-serif";
-
-  // HP Highlight Rect
-  const hpGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  // Zonas do Horário de Ponta (com suporte a virada de dia)
+  const hpZones = [];
   if (endHP > startHP) {
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', getX(startHP));
-    rect.setAttribute('y', padT);
-    rect.setAttribute('width', getX(startHP + 3) - getX(startHP));
-    rect.setAttribute('height', chartH);
-    rect.setAttribute('class', 'load-curve__hp-zone');
-    hpGroup.appendChild(rect);
+    hpZones.push({ from: startHP, to: startHP + 3 });
   } else {
-    const rect1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect1.setAttribute('x', getX(startHP));
-    rect1.setAttribute('y', padT);
-    rect1.setAttribute('width', getX(24) - getX(startHP));
-    rect1.setAttribute('height', chartH);
-    rect1.setAttribute('class', 'load-curve__hp-zone');
-    hpGroup.appendChild(rect1);
-
-    const rect2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect2.setAttribute('x', getX(0));
-    rect2.setAttribute('y', padT);
-    rect2.setAttribute('width', getX(endHP) - getX(0));
-    rect2.setAttribute('height', chartH);
-    rect2.setAttribute('class', 'load-curve__hp-zone');
-    hpGroup.appendChild(rect2);
-  }
-  svg.appendChild(hpGroup);
-
-  // Gridlines & Ticks Y
-  const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const tickCountY = 5;
-  for (let i = 0; i <= tickCountY; i++) {
-    const val = (maxY / tickCountY) * i;
-    const y = getY(val);
-    
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', padL);
-    line.setAttribute('y1', y);
-    line.setAttribute('x2', w - padR);
-    line.setAttribute('y2', y);
-    line.setAttribute('class', 'load-curve__grid');
-    gridGroup.appendChild(line);
-
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', padL - 10);
-    text.setAttribute('y', y + 4);
-    text.setAttribute('text-anchor', 'end');
-    text.setAttribute('class', 'load-curve__label');
-    text.textContent = formatNumber(val, 0) + ' kW';
-    gridGroup.appendChild(text);
+    hpZones.push({ from: startHP, to: 24 });
+    hpZones.push({ from: 0, to: endHP });
   }
 
-  // Ticks X (De 2 em 2 horas)
-  for (let h = 0; h <= 24; h += 2) {
-    const x = getX(h);
-    
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', x);
-    line.setAttribute('y1', padT);
-    line.setAttribute('x2', x);
-    line.setAttribute('y2', padT + chartH);
-    line.setAttribute('class', 'load-curve__grid');
-    gridGroup.appendChild(line);
+  const xAnnotations = hpZones.map((zone, idx) => ({
+    x: zone.from,
+    x2: zone.to,
+    fillColor: '#ef4444',
+    opacity: 0.08,
+    borderColor: 'transparent',
+    label: idx === 0 ? {
+      text: 'Horário de Ponta',
+      orientation: 'horizontal',
+      position: 'top',
+      offsetY: -8,
+      style: {
+        color: '#fca5a5',
+        background: 'transparent',
+        fontSize: '11px',
+        fontWeight: 600
+      }
+    } : undefined
+  }));
 
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', x);
-    text.setAttribute('y', padT + chartH + 18);
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('class', 'load-curve__label');
-    text.textContent = `${h}h`;
-    gridGroup.appendChild(text);
-  }
-
-  // Centered X-axis label "Hora (h)" (Recommendation 2)
-  const xAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  xAxisLabel.setAttribute('x', padL + chartW / 2);
-  xAxisLabel.setAttribute('y', padT + chartH + 34);
-  xAxisLabel.setAttribute('text-anchor', 'middle');
-  xAxisLabel.setAttribute('class', 'load-curve__label');
-  xAxisLabel.setAttribute('font-weight', 'bold');
-  xAxisLabel.textContent = 'Hora (h)';
-  gridGroup.appendChild(xAxisLabel);
-
-  svg.appendChild(gridGroup);
-
-  // Area: BESS Charge (Blue) hour-by-hour polygon path
-  chargeHoursSet.forEach(h => {
-    const chargeArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const topStart = loadRede[h];
-    const topEnd = chargeHoursSet.has((h + 1) % 24) ? loadRede[(h + 1) % 24] : baseLoad[(h + 1) % 24];
-    const d = `M ${getX(h)} ${getY(baseLoad[h])} ` +
-              `L ${getX(h)} ${getY(topStart)} ` +
-              `L ${getX(h + 1)} ${getY(topEnd)} ` +
-              `L ${getX(h + 1)} ${getY(baseLoad[(h + 1) % 24])} Z`;
-    chargeArea.setAttribute('d', d);
-    chargeArea.setAttribute('fill', '#3b82f6');
-    chargeArea.setAttribute('fill-opacity', '0.25');
-    svg.appendChild(chargeArea);
-  });
-
-  // Area: BESS Discharge (Amber)
-  const dischargeArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  let dischargeD = `M ${getX(startHP)} ${getY(baseLoad[startHP])}`;
-  for (let h = startHP; h <= startHP + 3; h++) {
-    const hr = h % 24;
-    const val = h === startHP + 3 ? baseLoad[hr] : (baseLoad[hr] - P_descarga);
-    dischargeD += ` L ${getX(h)} ${getY(val)}`;
-  }
-  for (let h = startHP + 3; h >= startHP; h--) {
-    const hr = h % 24;
-    dischargeD += ` L ${getX(h)} ${getY(baseLoad[hr])}`;
-  }
-  dischargeD += ' Z';
-  dischargeArea.setAttribute('d', dischargeD);
-  dischargeArea.setAttribute('fill', '#f59e0b');
-  dischargeArea.setAttribute('fill-opacity', '0.3');
-  svg.appendChild(dischargeArea);
-
-  // Curve: Base Load - Primary Green Line (Recommendation 8)
-  const baseLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  let baseD = `M ${getX(0)} ${getY(baseLoad[0])}`;
-  for (let h = 1; h <= 24; h++) {
-    baseD += ` L ${getX(h)} ${getY(baseLoad[h % 24])}`;
-  }
-  baseLine.setAttribute('d', baseD);
-  baseLine.setAttribute('fill', 'none');
-  baseLine.setAttribute('stroke', colorPrimary);
-  baseLine.setAttribute('stroke-width', '2.5');
-  baseLine.setAttribute('class', 'load-curve__curve');
-  svg.appendChild(baseLine);
-
-  // Curve: Grid Load (Rede + BESS) (Recommendation 8)
-  const gridLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  let gridD = `M ${getX(0)} ${getY(loadRede[0])}`;
-  for (let h = 1; h <= 24; h++) {
-    gridD += ` L ${getX(h)} ${getY(loadRede[h % 24])}`;
-  }
-  gridLine.setAttribute('d', gridD);
-  gridLine.setAttribute('fill', 'none');
-  gridLine.setAttribute('stroke', '#a78bfa');
-  gridLine.setAttribute('stroke-dasharray', '4 3');
-  gridLine.setAttribute('stroke-width', '2.0');
-  gridLine.setAttribute('class', 'load-curve__curve');
-  svg.appendChild(gridLine);
-
-  // Cost Annotations
-  // Encontrar uma das horas de carga representativas para a anotação
-  const chargeAnnHour = [...chargeHoursSet].sort((a,b) => a-b)[Math.floor(N/2)] || 3;
-  const chargeAnn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  chargeAnn.setAttribute('x', getX(chargeAnnHour));
-  chargeAnn.setAttribute('y', getY(baseLoad[chargeAnnHour] + P_carga) - 12);
-  chargeAnn.setAttribute('text-anchor', 'middle');
-  chargeAnn.setAttribute('fill', '#60a5fa');
-  chargeAnn.setAttribute('font-size', '10');
-  chargeAnn.setAttribute('font-weight', 'bold');
-  chargeAnn.textContent = `Carga FP: R$ ${formatNumber(outputs.cost_charge_offpeak_brl, 2)}`;
-  svg.appendChild(chargeAnn);
-
-  const dischargeAnn = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  const midHP = startHP + 1.5;
-  dischargeAnn.setAttribute('x', getX(midHP));
-  dischargeAnn.setAttribute('y', getY(baseLoad[Math.floor(midHP) % 24] - P_descarga) + 20);
-  dischargeAnn.setAttribute('text-anchor', 'middle');
-  dischargeAnn.setAttribute('fill', '#fbbf24');
-  dischargeAnn.setAttribute('font-size', '10');
-  dischargeAnn.setAttribute('font-weight', 'bold');
-  dischargeAnn.textContent = `Evitado HP: R$ ${formatNumber(outputs.cost_avoided_peak_brl, 2)}`;
-  svg.appendChild(dischargeAnn);
-
-  const hpLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  hpLabel.setAttribute('x', getX(midHP));
-  hpLabel.setAttribute('y', padT - 10);
-  hpLabel.setAttribute('text-anchor', 'middle');
-  hpLabel.setAttribute('fill', '#fca5a5');
-  hpLabel.setAttribute('font-size', '10');
-  hpLabel.setAttribute('font-weight', '600');
-  hpLabel.textContent = 'Horário de Ponta';
-  svg.appendChild(hpLabel);
-
-  const yAxisLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  yAxisLabel.setAttribute('transform', 'rotate(-90)');
-  yAxisLabel.setAttribute('x', -(padT + chartH / 2));
-  yAxisLabel.setAttribute('y', padL - 48);
-  yAxisLabel.setAttribute('text-anchor', 'middle');
-  yAxisLabel.setAttribute('fill', colorMute);
-  yAxisLabel.setAttribute('font-size', '10');
-  yAxisLabel.textContent = 'Potência (kW)';
-  svg.appendChild(yAxisLabel);
-
-  // Legend Group inside the SVG (Problem 3)
-  const legendGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  legendGroup.setAttribute('transform', 'translate(0, 430)');
-
-  const legendItems = [
-    { label: 'Rede Base', color: colorPrimary, type: 'line' },
-    { label: 'Rede com BESS', color: '#a78bfa', type: 'dashed-line' },
-    { label: 'Carga BESS (FP)', color: '#3b82f6', type: 'rect', opacity: 0.25 },
-    { label: 'Descarga BESS (HP)', color: '#f59e0b', type: 'rect', opacity: 0.3 },
-    { label: 'Horário de Ponta', color: '#ef4444', type: 'rect', opacity: 0.12 }
+  // Anotações de custo (carga FP e descarga HP)
+  const chargeAnnHour = [...chargeHoursSet].sort((a, b) => a - b)[Math.floor(N / 2)] || 3;
+  const midHP = (startHP + 1.5) % 24;
+  const pointAnnotations = [
+    {
+      x: chargeAnnHour,
+      y: baseLoad[chargeAnnHour] + P_carga,
+      marker: { size: 4, fillColor: '#3b82f6', strokeColor: '#1a1a1a', strokeWidth: 2 },
+      label: {
+        text: `Carga FP: R$ ${formatNumber(outputs.cost_charge_offpeak_brl, 2)}`,
+        offsetY: -8,
+        borderColor: '#3b82f6',
+        style: { background: '#101010', color: '#60a5fa', fontSize: '11px', fontWeight: 600, padding: { left: 6, right: 6, top: 3, bottom: 3 } }
+      }
+    },
+    {
+      x: midHP,
+      y: baseLoad[Math.floor(midHP) % 24] - P_descarga,
+      marker: { size: 4, fillColor: '#f59e0b', strokeColor: '#1a1a1a', strokeWidth: 2 },
+      label: {
+        text: `Evitado HP: R$ ${formatNumber(outputs.cost_avoided_peak_brl, 2)}`,
+        offsetY: 42,
+        borderColor: '#f59e0b',
+        style: { background: '#101010', color: '#fbbf24', fontSize: '11px', fontWeight: 600, padding: { left: 6, right: 6, top: 3, bottom: 3 } }
+      }
+    }
   ];
 
-  let currentX = 50;
-  legendItems.forEach(item => {
-    if (item.type === 'line') {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', currentX);
-      line.setAttribute('y1', -4);
-      line.setAttribute('x2', currentX + 15);
-      line.setAttribute('y2', -4);
-      line.setAttribute('stroke', item.color);
-      line.setAttribute('stroke-width', '2.5');
-      legendGroup.appendChild(line);
-    } else if (item.type === 'dashed-line') {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', currentX);
-      line.setAttribute('y1', -4);
-      line.setAttribute('x2', currentX + 15);
-      line.setAttribute('y2', -4);
-      line.setAttribute('stroke', item.color);
-      line.setAttribute('stroke-width', '2');
-      line.setAttribute('stroke-dasharray', '4 3');
-      legendGroup.appendChild(line);
-    } else if (item.type === 'rect') {
-      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      rect.setAttribute('x', currentX);
-      rect.setAttribute('y', -10);
-      rect.setAttribute('width', 15);
-      rect.setAttribute('height', 12);
-      rect.setAttribute('rx', 2);
-      rect.setAttribute('fill', item.color);
-      rect.setAttribute('fill-opacity', item.opacity);
-      legendGroup.appendChild(rect);
+  const options = {
+    chart: {
+      type: 'area',
+      height: 360,
+      background: 'transparent',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      animations: { enabled: true, speed: 500 }
+    },
+    theme: { mode: 'dark' },
+    series: [
+      { name: 'Rede Base', data: baseSeries },
+      { name: 'Rede com BESS', data: gridSeries }
+    ],
+    colors: [colorPrimary, '#a78bfa'],
+    stroke: {
+      curve: 'smooth',
+      width: [3, 2.5],
+      dashArray: [0, 6]
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: [0.45, 0.12],
+        opacityTo: [0.05, 0.02],
+        stops: [0, 100]
+      }
+    },
+    dataLabels: { enabled: false },
+    grid: {
+      borderColor: colorHairline,
+      strokeDashArray: 3,
+      padding: { top: 10 }
+    },
+    markers: { size: 0, hover: { size: 5 } },
+    xaxis: {
+      type: 'numeric',
+      min: 0,
+      max: 24,
+      tickAmount: 12,
+      labels: {
+        style: { colors: colorMute, fontSize: '11px' },
+        formatter: (val) => `${Math.round(val)}h`
+      },
+      axisBorder: { show: false },
+      axisTicks: { color: colorHairline },
+      title: { text: 'Hora (h)', style: { color: colorMute, fontSize: '11px', fontWeight: 500 } }
+    },
+    yaxis: {
+      labels: {
+        style: { colors: colorMute, fontSize: '11px' },
+        formatter: (val) => `${formatNumber(val, 0)} kW`
+      },
+      title: { text: 'Potência (kW)', style: { color: colorMute, fontSize: '11px', fontWeight: 500 } }
+    },
+    legend: {
+      position: 'bottom',
+      horizontalAlign: 'center',
+      labels: { colors: colorMute },
+      markers: { width: 10, height: 10, radius: 3 }
+    },
+    tooltip: {
+      shared: true,
+      theme: 'dark',
+      x: { formatter: (val) => `Hora: ${Math.round(val)}h` },
+      y: { formatter: (val) => `${formatNumber(val, 1)} kW` }
+    },
+    annotations: {
+      xaxis: xAnnotations,
+      points: pointAnnotations
     }
+  };
 
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', currentX + 22);
-    text.setAttribute('y', 0);
-    text.setAttribute('fill', colorMute);
-    text.setAttribute('font-size', '11');
-    text.textContent = item.label;
-    legendGroup.appendChild(text);
+  if (bessCharts.loadCurve) {
+    bessCharts.loadCurve.destroy();
+    bessCharts.loadCurve = null;
+  }
+  container.innerHTML = '';
 
-    currentX += item.label.length * 6 + 45;
-  });
-  svg.appendChild(legendGroup);
-
-  return svg;
+  bessCharts.loadCurve = new ApexCharts(container, options);
+  bessCharts.loadCurve.render();
 }
 
 /* ====================================================================
- * SEÇÃO 5: SVG_UNIFILAR — Geração do diagrama unifilar
+ * SEÇÃO 5: UNIFILAR — Diagrama unifilar em HTML/CSS
  * ==================================================================== */
 
-function generateUnifilar(outputs, inputs) {
-  const rootStyles = getComputedStyle(document.documentElement);
-  const colorPrimary = rootStyles.getPropertyValue('--color-primary').trim() || '#00d992';
-  const colorMute = rootStyles.getPropertyValue('--color-mute').trim() || '#8b949e';
-  
+function renderUnifilar(container, outputs, inputs) {
+  if (!container) return;
+
   const protectionType = inputs['equipamento-protecao'] || 'ATS';
   const protectionLabel = (protectionType === 'ATS') ? 'Chave ATS' : 'Barramento QGBT';
 
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="100%" height="100%" style="background: transparent; font-family: 'Inter', system-ui, sans-serif;">
-  <!-- Rede Concessionária -->
-  <g class="unifilar-group">
-    <circle cx="200" cy="40" r="15" fill="#1a1a1a" stroke="var(--color-primary)" stroke-width="2" />
-    <path d="M 193 40 L 207 40 M 200 33 L 200 47" stroke="var(--color-primary)" stroke-width="2" />
-    <text x="200" y="72" text-anchor="middle" class="unifilar__text-primary">⚡ Rede Concessionária</text>
-  </g>
+  container.innerHTML = `
+    <div class="unifilar" id="unifilar-capture">
+      <div class="node-card node-card--grid">
+        <span class="node-card__icon" aria-hidden="true">⚡</span>
+        <span class="node-card__title">Rede Concessionária</span>
+        <span class="node-card__sub">AC 3Φ — Média Tensão</span>
+      </div>
 
-  <!-- AC Line: Rede -> Medidor -->
-  <line x1="200" y1="78" x2="200" y2="120" class="unifilar__line unifilar__line-ac" />
+      <div class="uni-wire uni-wire--ac"></div>
 
-  <!-- Medidor -->
-  <g class="unifilar-group">
-    <rect x="150" y="120" width="100" height="50" rx="4" class="unifilar__node" />
-    <text x="200" y="140" text-anchor="middle" class="unifilar__text-primary">Medidor</text>
-    <text x="200" y="158" text-anchor="middle" class="unifilar__text-secondary">Medidor Inteligente</text>
-  </g>
+      <div class="node-card">
+        <span class="node-card__icon" aria-hidden="true">📟</span>
+        <span class="node-card__title">Medidor</span>
+        <span class="node-card__sub">Medidor Inteligente</span>
+      </div>
 
-  <!-- AC Line: Medidor -> Proteção -->
-  <line x1="200" y1="170" x2="200" y2="220" class="unifilar__line unifilar__line-ac" />
+      <div class="uni-wire uni-wire--ac"></div>
 
-  <!-- ATS / QGBT -->
-  <g class="unifilar-group">
-    <rect x="130" y="220" width="140" height="60" rx="6" class="unifilar__node" />
-    <text x="200" y="244" text-anchor="middle" class="unifilar__text-primary">${protectionLabel}</text>
-    <text x="200" y="264" text-anchor="middle" class="unifilar__text-secondary">Ponto Conexão</text>
-  </g>
+      <div class="node-card node-card--accent">
+        <span class="node-card__icon" aria-hidden="true">🔀</span>
+        <span class="node-card__title">${protectionLabel}</span>
+        <span class="node-card__sub">Ponto de Conexão</span>
+      </div>
 
-  <!-- AC Line Left: Proteção -> Cargas -->
-  <path d="M 200 280 L 200 310 L 90 310 L 90 360" class="unifilar__line unifilar__line-ac" />
+      <div class="uni-branch" aria-hidden="true"></div>
 
-  <!-- AC Line Right: Proteção -> PCS -->
-  <path d="M 200 280 L 200 310 L 310 310 L 310 360" class="unifilar__line unifilar__line-ac" />
+      <div class="uni-row">
+        <div class="uni-col">
+          <div class="node-card node-card--loads">
+            <span class="node-card__icon" aria-hidden="true">🏭</span>
+            <span class="node-card__title">Cargas C&amp;I</span>
+            <span class="node-card__sub">Consumo Instalado</span>
+          </div>
+          <div class="uni-wire uni-wire--comm uni-wire--tall"></div>
+          <div class="node-card node-card--comm">
+            <span class="node-card__icon" aria-hidden="true">🖥️</span>
+            <span class="node-card__title">Controlador EMS</span>
+            <span class="node-card__sub">Gestão Local</span>
+          </div>
+        </div>
 
-  <!-- Cargas C&I -->
-  <g class="unifilar-group">
-    <rect x="40" y="360" width="100" height="60" rx="6" class="unifilar__node" />
-    <text x="90" y="386" text-anchor="middle" class="unifilar__text-primary">Cargas C&I</text>
-    <text x="90" y="404" text-anchor="middle" class="unifilar__text-secondary">Consumo Inst.</text>
-  </g>
+        <div class="uni-col">
+          <div class="node-card">
+            <span class="node-card__icon" aria-hidden="true">🔄</span>
+            <span class="node-card__title">PCS (Inversor)</span>
+            <span class="node-card__sub">Bidirecional</span>
+          </div>
+          <div class="uni-wire-labeled">
+            <div class="uni-wire uni-wire--dc uni-wire--tall"></div>
+            <span class="uni-wire-label uni-text--dc">Barramento CC</span>
+          </div>
+          <div class="node-card node-card--bess">
+            <span class="node-card__icon" aria-hidden="true">🔋</span>
+            <span class="node-card__title">Bateria LFP</span>
+            <span class="node-card__sub">${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</span>
+          </div>
+        </div>
+      </div>
 
-  <!-- PCS (Inversor Bidirecional) -->
-  <g class="unifilar-group">
-    <rect x="260" y="360" width="100" height="60" rx="6" class="unifilar__node" />
-    <text x="310" y="386" text-anchor="middle" class="unifilar__text-primary">PCS (Inversor)</text>
-    <text x="310" y="404" text-anchor="middle" class="unifilar__text-secondary">Bidirecional</text>
-  </g>
+      <div class="uni-comm-link" aria-hidden="true">
+        <div class="uni-comm-link__line"></div>
+        <span class="uni-comm-link__label">Modbus TCP / RS485</span>
+      </div>
 
-  <!-- DC Line: PCS -> Bateria -->
-  <line x1="310" y1="420" x2="310" y2="480" class="unifilar__line unifilar__line-dc" />
-  <text x="325" y="455" fill="var(--color-dc-line)" font-size="10" font-weight="bold">Barramento CC</text>
-
-  <!-- Bateria LFP -->
-  <g class="unifilar-group">
-    <rect x="260" y="480" width="100" height="60" rx="6" class="unifilar__node" />
-    <text x="310" y="506" text-anchor="middle" class="unifilar__text-primary">Bateria LFP</text>
-    <text x="310" y="524" text-anchor="middle" class="unifilar__text-secondary">${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</text>
-  </g>
-
-  <!-- EMS (Gerenciador de Energia) -->
-  <g class="unifilar-group">
-    <rect x="40" y="480" width="100" height="60" rx="6" class="unifilar__node" />
-    <text x="90" y="506" text-anchor="middle" class="unifilar__text-primary">Controlador EMS</text>
-    <text x="90" y="524" text-anchor="middle" class="unifilar__text-secondary">Gestão Local</text>
-  </g>
-
-  <!-- Communication Line (Dashed) -->
-  <path d="M 90 480 L 90 440 L 310 440" class="unifilar__line unifilar__line-comm" />
-  <path d="M 90 440 L 90 250 L 130 250" class="unifilar__line unifilar__line-comm" />
-  <text x="145" y="435" fill="var(--color-comm-line)" font-size="9" font-style="italic">Modbus TCP / RS485</text>
-</svg>
+      <div class="uni-legend">
+        <span class="uni-legend__item"><span class="uni-legend__swatch uni-legend__swatch--ac"></span>Fiação AC</span>
+        <span class="uni-legend__item"><span class="uni-legend__swatch uni-legend__swatch--dc"></span>Fiação DC</span>
+        <span class="uni-legend__item"><span class="uni-legend__swatch uni-legend__swatch--comm"></span>Comunicação</span>
+      </div>
+    </div>
   `;
-  return svg.trim();
 }
 
 /* ====================================================================
- * SEÇÃO 6: SVG_DEGRADATION — Geração do gráfico de degradação
+ * SEÇÃO 6: DEGRADATION_CHART — Curva de degradação com ApexCharts
  * ==================================================================== */
 
-function generateDegradationCurve(outputs, inputs) {
+function renderDegradationChart(container, outputs, inputs) {
+  if (!container || typeof ApexCharts === 'undefined') return;
+
   const rootStyles = getComputedStyle(document.documentElement);
   const colorPrimary = rootStyles.getPropertyValue('--color-primary').trim() || '#00d992';
   const colorMute = rootStyles.getPropertyValue('--color-mute').trim() || '#8b949e';
+  const colorHairline = rootStyles.getPropertyValue('--color-hairline').trim() || '#3d3a39';
 
   const curves = outputs.degradation_curves;
   const eolPercent = inputs['equipamento-eol'] || 70.0;
   const cyclesPerDay = inputs['projeto-ciclos-dia'] || 1;
 
+  const toSeries = (arr) => arr.map((soh, yr) => [yr, Math.round(soh * 100) / 100]);
+
   const minSoH = Math.min(...curves['0.5P'], ...curves['0.25P'], ...curves['0.1C']);
-  const minY = Math.max(0, Math.floor(Math.min(minSoH, eolPercent) / 10) * 10 - 10);
+  const minY = Math.max(0, Math.floor(Math.min(minSoH, eolPercent) / 10) * 10 - 5);
 
-  const w = 800;
-  const h_svg = 400;
-  const padL = 60;
-  const padR = 40;
-  const padT = 40;
-  const padB = 75; // Adjusted to leave space for the inline legend
-  const chartW = w - padL - padR;
-  const chartH = h_svg - padT - padB;
-
-  function getX(yr) {
-    return padL + (yr / 15) * chartW;
-  }
-  function getY(soh) {
-    if (Number.isNaN(soh) || !Number.isFinite(soh)) return padT + chartH;
-    return padT + chartH - ((soh - minY) / (100 - minY)) * chartH;
-  }
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', `0 0 ${w} ${h_svg}`);
-  svg.setAttribute('width', '100%');
-  svg.setAttribute('height', '100%');
-  svg.style.background = 'transparent';
-  svg.style.fontFamily = "'Inter', system-ui, sans-serif";
-
-  // Grid Y
-  const gridGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const startTick = Math.ceil(minY / 10) * 10;
-  for (let val = startTick; val <= 100; val += 10) {
-    const y = getY(val);
-    
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', padL);
-    line.setAttribute('y1', y);
-    line.setAttribute('x2', w - padR);
-    line.setAttribute('y2', y);
-    line.setAttribute('class', 'degradation__grid');
-    gridGroup.appendChild(line);
-
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', padL - 10);
-    text.setAttribute('y', y + 4);
-    text.setAttribute('text-anchor', 'end');
-    text.setAttribute('class', 'degradation__label');
-    text.textContent = `${val}%`;
-    gridGroup.appendChild(text);
-  }
-
-  // Grid X & Labels
-  for (let yr = 0; yr <= 15; yr += 5) {
-    const x = getX(yr);
-    
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', x);
-    line.setAttribute('y1', padT);
-    line.setAttribute('x2', x);
-    line.setAttribute('y2', padT + chartH);
-    line.setAttribute('class', 'degradation__grid');
-    gridGroup.appendChild(line);
-
-    const textYr = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    textYr.setAttribute('x', x);
-    textYr.setAttribute('y', padT + chartH + 18);
-    textYr.setAttribute('text-anchor', 'middle');
-    textYr.setAttribute('class', 'degradation__label');
-    textYr.setAttribute('font-weight', 'bold');
-    textYr.textContent = `Ano ${yr}`;
-    gridGroup.appendChild(textYr);
-
-    const textCyc = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    textCyc.setAttribute('x', x);
-    textCyc.setAttribute('y', padT + chartH + 30);
-    textCyc.setAttribute('text-anchor', 'middle');
-    textCyc.setAttribute('class', 'degradation__label');
-    const cycles = Math.round(yr * 365 * cyclesPerDay);
-    textCyc.textContent = `(${formatNumber(cycles, 0)} cic)`;
-    gridGroup.appendChild(textCyc);
-  }
-  svg.appendChild(gridGroup);
-
-  // EOL Line
-  const eolY = getY(eolPercent);
-  const eolLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-  eolLine.setAttribute('x1', padL);
-  eolLine.setAttribute('y1', eolY);
-  eolLine.setAttribute('x2', w - padR);
-  eolLine.setAttribute('y2', eolY);
-  eolLine.setAttribute('class', 'degradation__eol-line');
-  svg.appendChild(eolLine);
-
-  const eolText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  eolText.setAttribute('x', w - padR - 5);
-  eolText.setAttribute('y', eolY - 6);
-  eolText.setAttribute('text-anchor', 'end');
-  eolText.setAttribute('fill', '#8b5cf6');
-  eolText.setAttribute('font-size', '10');
-  eolText.setAttribute('font-weight', 'bold');
-  eolText.textContent = `EOL: ${formatNumber(eolPercent, 1)}%`;
-  svg.appendChild(eolText);
-
-  // Curves
-  const cRates = ['0.5P', '0.25P', '0.1C'];
-  const colors = {
-    '0.5P': '#ef4444',
-    '0.25P': '#f59e0b',
-    '0.1C': colorPrimary
+  const options = {
+    chart: {
+      type: 'area',
+      height: 360,
+      background: 'transparent',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      animations: { enabled: true, speed: 500 }
+    },
+    theme: { mode: 'dark' },
+    series: [
+      { name: '0.1C (Extrapolado)', data: toSeries(curves['0.1C']) },
+      { name: '0.25P (Datasheet)', data: toSeries(curves['0.25P']) },
+      { name: '0.5P (Datasheet)', data: toSeries(curves['0.5P']) }
+    ],
+    colors: [colorPrimary, '#f59e0b', '#ef4444'],
+    stroke: { curve: 'smooth', width: 2.5 },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.18,
+        opacityTo: 0.02,
+        stops: [0, 100]
+      }
+    },
+    dataLabels: { enabled: false },
+    grid: {
+      borderColor: colorHairline,
+      strokeDashArray: 3,
+      padding: { top: 10 }
+    },
+    markers: { size: 0, hover: { size: 5 } },
+    xaxis: {
+      type: 'numeric',
+      min: 0,
+      max: 15,
+      tickAmount: 15,
+      labels: {
+        style: { colors: colorMute, fontSize: '11px' },
+        formatter: (val) => `${Math.round(val)}`
+      },
+      axisBorder: { show: false },
+      axisTicks: { color: colorHairline },
+      title: { text: 'Anos de Operação', style: { color: colorMute, fontSize: '11px', fontWeight: 500 } }
+    },
+    yaxis: {
+      min: minY,
+      max: 100,
+      tickAmount: Math.max(2, Math.round((100 - minY) / 5)),
+      labels: {
+        style: { colors: colorMute, fontSize: '11px' },
+        formatter: (val) => `${formatNumber(val, 0)}%`
+      },
+      title: { text: 'Estado de Saúde (SoH %)', style: { color: colorMute, fontSize: '11px', fontWeight: 500 } }
+    },
+    legend: {
+      position: 'bottom',
+      horizontalAlign: 'center',
+      labels: { colors: colorMute },
+      markers: { width: 10, height: 10, radius: 3 }
+    },
+    tooltip: {
+      shared: true,
+      theme: 'dark',
+      x: {
+        formatter: (val) => {
+          const cycles = Math.round(val * 365 * cyclesPerDay);
+          return `Ano ${Math.round(val)} • ${formatNumber(cycles, 0)} ciclos acumulados`;
+        }
+      },
+      y: { formatter: (val) => `${formatNumber(val, 1)}% SoH` }
+    },
+    annotations: {
+      yaxis: [
+        {
+          y: eolPercent,
+          borderColor: '#8b5cf6',
+          strokeDashArray: 5,
+          label: {
+            text: `Limite EOL: ${formatNumber(eolPercent, 1)}%`,
+            position: 'right',
+            offsetY: -6,
+            borderColor: 'transparent',
+            style: { background: 'transparent', color: '#a78bfa', fontSize: '11px', fontWeight: 600 }
+          }
+        }
+      ]
+    }
   };
-  
-  cRates.forEach(rate => {
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    let d = `M ${getX(0)} ${getY(curves[rate][0])}`;
-    for (let yr = 1; yr <= 15; yr++) {
-      d += ` L ${getX(yr)} ${getY(curves[rate][yr])}`;
-    }
-    path.setAttribute('d', d);
-    path.setAttribute('class', 'degradation__curve');
-    path.setAttribute('stroke', colors[rate]);
-    svg.appendChild(path);
-  });
 
-  const yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  yLabel.setAttribute('transform', 'rotate(-90)');
-  yLabel.setAttribute('x', -(padT + chartH / 2));
-  yLabel.setAttribute('y', padL - 42);
-  yLabel.setAttribute('text-anchor', 'middle');
-  yLabel.setAttribute('fill', colorMute);
-  yLabel.setAttribute('font-size', '10');
-  yLabel.textContent = 'Estado de Saúde (SoH %)';
-  svg.appendChild(yLabel);
+  if (bessCharts.degradation) {
+    bessCharts.degradation.destroy();
+    bessCharts.degradation = null;
+  }
+  container.innerHTML = '';
 
-  // Legend Group inside the SVG (Problem 3)
-  const legendGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  legendGroup.setAttribute('transform', 'translate(0, 382)');
-
-  const legendItems = [
-    { label: '0.1C (Extrapolado)', color: colors['0.1C'], type: 'line' },
-    { label: '0.25P (Datasheet)', color: colors['0.25P'], type: 'line' },
-    { label: '0.5P (Datasheet)', color: colors['0.5P'], type: 'line' },
-    { label: 'Limite EOL', color: '#8b5cf6', type: 'dashed-line' }
-  ];
-
-  let currentX = 60;
-  legendItems.forEach(item => {
-    if (item.type === 'line') {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', currentX);
-      line.setAttribute('y1', -4);
-      line.setAttribute('x2', currentX + 15);
-      line.setAttribute('y2', -4);
-      line.setAttribute('stroke', item.color);
-      line.setAttribute('stroke-width', '2.5');
-      legendGroup.appendChild(line);
-    } else if (item.type === 'dashed-line') {
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', currentX);
-      line.setAttribute('y1', -4);
-      line.setAttribute('x2', currentX + 15);
-      line.setAttribute('y2', -4);
-      line.setAttribute('stroke', item.color);
-      line.setAttribute('stroke-width', '1.5');
-      line.setAttribute('stroke-dasharray', '4 4');
-      legendGroup.appendChild(line);
-    }
-
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', currentX + 22);
-    text.setAttribute('y', 0);
-    text.setAttribute('fill', colorMute);
-    text.setAttribute('font-size', '11');
-    text.textContent = item.label;
-    legendGroup.appendChild(text);
-
-    currentX += item.label.length * 6 + 40;
-  });
-  svg.appendChild(legendGroup);
-
-  return svg;
+  bessCharts.degradation = new ApexCharts(container, options);
+  bessCharts.degradation.render();
 }
 
 /* ====================================================================
- * SEÇÃO 7: PDF_EXPORT — Geração do relatório PDF (jsPDF + svg2pdf.js)
+ * SEÇÃO 7: PDF_EXPORT — Geração do relatório PDF (jsPDF + html2canvas)
  * ==================================================================== */
 
-// Helper to inline computed styles on cloned SVG nodes before rendering in jsPDF
-function prepareSvgForPdf(svgElement) {
-  const clone = svgElement.cloneNode(true);
-  
-  function applyStyles(original, copy) {
-    const computed = window.getComputedStyle(original);
-    const styleProps = [
-      'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-opacity',
-      'fill', 'fill-opacity',
-      'font-family', 'font-size', 'font-weight', 'text-anchor',
-      'opacity', 'display', 'visibility'
-    ];
-    
-    styleProps.forEach(prop => {
-      const val = computed.getPropertyValue(prop);
-      if (val && val !== 'none' && val !== 'normal' && val !== 'auto') {
-        copy.setAttribute(prop, val);
-      }
-    });
-    
-    for (let i = 0; i < original.children.length; i++) {
-      if (copy.children[i]) {
-        applyStyles(original.children[i], copy.children[i]);
-      }
-    }
-  }
-  
-  applyStyles(svgElement, clone);
-  
-  // Embed document stylesheets inside the clone as a <style> block to handle any foreignObject/KaTeX styles (Issue 2)
-  let cssText = "";
-  try {
-    for (const sheet of document.styleSheets) {
-      try {
-        if (sheet.cssRules) {
-          for (const rule of sheet.cssRules) {
-            cssText += rule.cssText + "\n";
-          }
-        }
-      } catch (e) {
-        // Ignora erros de CORS de fontes externas
-      }
-    }
-  } catch (e) {
-    console.warn("prepareSvgForPdf: Erro ao ler folhas de estilo:", e);
-  }
-  
-  if (cssText) {
-    const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
-    styleEl.textContent = cssText;
-    clone.insertBefore(styleEl, clone.firstChild);
-  }
-  
-  return clone;
+// Captura um bloco HTML como PNG (dataURL) via html2canvas
+async function captureElementPng(element, backgroundColor = null, scale = 2) {
+  if (!element || typeof html2canvas === 'undefined') return null;
+  const canvas = await html2canvas(element, { backgroundColor, scale, logging: false });
+  return { dataUrl: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
+}
+
+// Obtém o PNG de um gráfico via exportador nativo do ApexCharts
+async function captureChartPng(chart) {
+  if (!chart) return null;
+  const { imgURI } = await chart.dataURI({ scale: 2 });
+  const size = await getImageSize(imgURI);
+  return { dataUrl: imgURI, width: size.width, height: size.height };
+}
+
+// Resolve as dimensões reais de uma imagem dataURL
+function getImageSize(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// Insere uma captura no PDF ajustada a uma caixa (mantendo proporção) sobre fundo escuro
+function addCaptureToPdf(doc, capture, x, y, boxW, boxH) {
+  if (!capture || !capture.width || !capture.height) return;
+  const ratio = Math.min(boxW / capture.width, boxH / capture.height);
+  const w = capture.width * ratio;
+  const h = capture.height * ratio;
+  doc.setFillColor(16, 16, 16);
+  doc.roundedRect(x, y, w, h, 1.5, 1.5, 'F');
+  doc.addImage(capture.dataUrl, 'PNG', x, y, w, h);
 }
 
 // Normalize accented characters and remove spaces/special characters
@@ -1188,8 +963,8 @@ async function generatePDF() {
     if (!window.jspdf || !window.jspdf.jsPDF) {
       throw new Error("SDK do jsPDF não foi carregado. Verifique sua conexão à internet.");
     }
-    if (!window.svg2pdf) {
-      throw new Error("Biblioteca svg2pdf.js não foi carregada. Verifique sua conexão à internet.");
+    if (typeof html2canvas === 'undefined') {
+      throw new Error("Biblioteca html2canvas não foi carregada. Verifique sua conexão à internet.");
     }
     
     const { jsPDF } = window.jspdf;
@@ -1393,32 +1168,32 @@ async function generatePDF() {
     doc.setTextColor(16, 16, 16);
     doc.text("3. Gráficos Operacionais e Topologia", 20, 23);
     
-    const diagramSvg = document.querySelector("#diagram-container svg");
-    const loadCurveSvg = document.querySelector("#load-curve-container svg");
-    const unifilarSvg = document.querySelector("#unifilar-container svg");
-    const degradationSvg = document.querySelector("#degradation-container svg");
-    
-    if (diagramSvg && loadCurveSvg && unifilarSvg && degradationSvg) {
-      const preparedDiag = prepareSvgForPdf(diagramSvg);
-      const preparedLoad = prepareSvgForPdf(loadCurveSvg);
-      const preparedUni = prepareSvgForPdf(unifilarSvg);
-      const preparedDeg = prepareSvgForPdf(degradationSvg);
-      
+    const diagramEl = document.querySelector("#diagram-container .flow-diagram");
+    const unifilarEl = document.querySelector("#unifilar-container .unifilar");
+
+    if (diagramEl && unifilarEl && bessCharts.loadCurve && bessCharts.degradation) {
+      const [capDiag, capLoad, capUni, capDeg] = await Promise.all([
+        captureElementPng(diagramEl, '#101010'),
+        captureChartPng(bessCharts.loadCurve),
+        captureElementPng(unifilarEl, '#101010'),
+        captureChartPng(bessCharts.degradation)
+      ]);
+
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(16, 16, 16);
-      
+
       // Top row of charts
       doc.text("Diagrama de Funcionamento", 20, 31);
       doc.text("Curva de Carga 24h", 115, 31);
-      await doc.svg(preparedDiag, { x: 20, y: 33, width: 85, height: 53.1 });
-      await doc.svg(preparedLoad, { x: 115, y: 33, width: 85, height: 53.1 });
-      
+      addCaptureToPdf(doc, capDiag, 20, 33, 85, 85);
+      addCaptureToPdf(doc, capLoad, 115, 33, 85, 85);
+
       // Bottom row of charts
-      doc.text("Diagrama Unifilar", 20, 105);
-      doc.text("Curva de Degradação (SoH)", 115, 105);
-      await doc.svg(preparedUni, { x: 25, y: 108, width: 75, height: 112.5 });
-      await doc.svg(preparedDeg, { x: 115, y: 108, width: 75, height: 112.5 });
+      doc.text("Diagrama Unifilar", 20, 125);
+      doc.text("Curva de Degradação (SoH)", 115, 125);
+      addCaptureToPdf(doc, capUni, 20, 128, 85, 130);
+      addCaptureToPdf(doc, capDeg, 115, 128, 85, 130);
     } else {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
@@ -1508,13 +1283,13 @@ async function saveSimulation(inputs, outputs) {
   }
   
   // Produção real com Supabase
-  if (!supabase) {
+  if (!supabaseDb) {
     console.warn("Supabase não disponível. Auto-save pulado.");
     return;
   }
   
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseDb
       .from('bes_simulations')
       .insert({
         user_id: userId,
@@ -1553,10 +1328,10 @@ async function fetchSimulations() {
     }
   }
   
-  if (!supabase) return [];
+  if (!supabaseDb) return [];
   
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseDb
       .from('bes_simulations')
       .select()
       .eq('user_id', userId)
@@ -1638,20 +1413,6 @@ function populateInputs(inputs) {
  * ==================================================================== */
 
 let isAppInitialized = false;
-let cachedKatexStyles = "";
-
-// Tenta carregar a folha de estilo do KaTeX via fetch para injeção posterior sem restrições CORS (Risco 1)
-async function cacheKatexStyles() {
-  try {
-    const res = await fetch("https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css");
-    if (res.ok) {
-      cachedKatexStyles = await res.text();
-      console.log("Calculadora BESS: Estilos KaTeX carregados em cache para exportação.");
-    }
-  } catch (e) {
-    console.warn("Calculadora BESS: Erro ao cachear estilos KaTeX via fetch:", e);
-  }
-}
 
 // Evento disparado pelo App Bridge real ou mockado
 document.addEventListener('workbench-ready', (event) => {
@@ -1667,7 +1428,6 @@ window.addEventListener('DOMContentLoaded', () => {
   setupRealTimeValidation();
   setupFormSubmit();
   setupResultEvents();
-  cacheKatexStyles(); // Executa em background para cachear CSS do KaTeX
 
   // Wire do dropdown de simulações
   const select = document.getElementById('simulations-select');
@@ -1934,34 +1694,13 @@ function setupFormSubmit() {
           
           // Render results
           renderRationale(outputs);
-          
+
           // Guardar dados para o PDF (Issue 1)
           lastCalculationInputs = inputs;
           lastCalculationOutputs = outputs;
-          
-          const diagramContainer = document.getElementById('diagram-container');
-          if (diagramContainer) {
-            diagramContainer.innerHTML = generateFlowDiagram(outputs, inputs['equipamento-protecao']);
-          }
 
-          const loadCurveContainer = document.getElementById('load-curve-container');
-          if (loadCurveContainer) {
-            loadCurveContainer.innerHTML = '';
-            loadCurveContainer.appendChild(generateLoadCurve(outputs, inputs));
-          }
-
-          const unifilarContainer = document.getElementById('unifilar-container');
-          if (unifilarContainer) {
-            unifilarContainer.innerHTML = generateUnifilar(outputs, inputs);
-          }
-
-          const degradationContainer = document.getElementById('degradation-container');
-          if (degradationContainer) {
-            degradationContainer.innerHTML = '';
-            degradationContainer.appendChild(generateDegradationCurve(outputs, inputs));
-          }
-          
-          // Reveal result containers with slide-down animation and reset opacity (PRD §3.3)
+          // Reveal result containers ANTES da renderização — o ApexCharts precisa
+          // do container visível para medir a largura corretamente (PRD §3.3)
           const sectionsToReveal = [l2, l3, l3_c2, l4_c1, l4_c2];
           sectionsToReveal.forEach(sec => {
             if (sec) {
@@ -1972,6 +1711,11 @@ function setupFormSubmit() {
               sec.classList.add('slide-down');
             }
           });
+
+          renderFlowDiagram(document.getElementById('diagram-container'), outputs, inputs['equipamento-protecao']);
+          renderLoadCurve(document.getElementById('load-curve-container'), outputs, inputs);
+          renderUnifilar(document.getElementById('unifilar-container'), outputs, inputs);
+          renderDegradationChart(document.getElementById('degradation-container'), outputs, inputs);
           
           // Exibe o botão de relatório PDF
           const pdfBtn = document.getElementById('btn-pdf-report');
@@ -2012,20 +1756,6 @@ function setupFormSubmit() {
   }
 }
 
-// Helper to render math formulas with KaTeX or fallback to plain text (Task 3.2, 5.4)
-function renderMath(formula, plainText) {
-  if (typeof katex !== 'undefined') {
-    try {
-      return katex.renderToString(formula, { displayMode: true, throwOnError: false });
-    } catch (e) {
-      console.warn("KaTeX render failed, using fallback:", e);
-      return `<div class="katex-fallback">${plainText}</div>`;
-    }
-  } else {
-    return `<div class="katex-fallback">${plainText}</div>`;
-  }
-}
-
 // Check recursively for NaN or Infinity values (Task 5.5)
 function hasInvalidValues(obj) {
   for (const key in obj) {
@@ -2040,27 +1770,22 @@ function hasInvalidValues(obj) {
   return false;
 }
 
-// Populates Linha 2 with math equations and calculation details (Task 3.1)
+// Popula a Linha 2 com os cards de racional (badge de fórmula + destaque numérico)
 function renderRationale(outputs) {
-  // Dimensionamento Formulas
-  const fNom = `E_{\\text{nom}} = \\frac{E_{\\text{ciclo}}}{DoD \\times RTE \\times \\eta_{\\text{sistema}}}`;
-  const fNomPlain = "E_nom = E_ciclo / (DoD * RTE * eta_sistema)";
-  document.getElementById('formula-nom').innerHTML = renderMath(fNom, fNomPlain);
-  
   const dodDecimal = outputs.dod_percent / 100;
   const rteDecimal = outputs.rte_percent / 100;
   const etaSys = outputs.eta_system;
-  
+
   document.getElementById('sub-nom').textContent = `E_nom = ${formatNumber(outputs.energy_per_cycle_kwh)} / (${formatNumber(dodDecimal)} * ${formatNumber(rteDecimal)} * ${formatNumber(etaSys)})`;
-  document.getElementById('result-nom').textContent = `E_nom ≈ ${formatNumber(outputs.nominal_energy_required_kwh)} kWh`;
-  
+  document.getElementById('result-nom').textContent = `${formatNumber(outputs.nominal_energy_required_kwh)} kWh`;
+
   const bessModel = document.getElementById('equipamento-modelo').value || "BESS";
   document.getElementById('bess-qty').textContent = `${outputs.bess_quantity}x ${bessModel}`;
-  
-  // Warning label for rounded down (Task 3.4)
+
+  // Banner de alerta de subdimensionamento (arredondamento para baixo)
   const warningLabel = document.getElementById('warning-subdimensionado');
   if (outputs.bess_quantity_rounded_down) {
-    warningLabel.style.display = 'block';
+    warningLabel.style.display = 'flex';
   } else {
     warningLabel.style.display = 'none';
   }
@@ -2084,288 +1809,85 @@ function renderRationale(outputs) {
   document.getElementById('val-economia').textContent = `R$ ${formatNumber(outputs.savings_per_cycle_brl)}`;
 }
 
-// Helper to serialize Linha 2 HTML into a self-contained SVG wrapping foreignObject (Task 5.3)
-function getLinha2SvgString() {
-  const element = document.querySelector('#linha-2 .rationale-grid');
-  if (!element) return '';
-  
-  const width = element.offsetWidth || 1200;
-  const height = element.offsetHeight || 400;
-  
-  const stylesText = `
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      color: #f2f2f2;
-      font-family: 'Inter', system-ui, sans-serif;
-      font-size: 13px;
-      line-height: 1.6;
-      background: transparent;
-      padding: 10px;
-    }
-    .rationale-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      width: 100%;
-      height: 100%;
-    }
-    .rationale-block {
-      background-color: #1a1a1a;
-      border: 1px solid #3d3a39;
-      border-radius: 8px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .rationale-block h4 {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      color: #ffffff;
-      border-bottom: 1px solid #3d3a39;
-      padding-bottom: 4px;
-      margin-bottom: 4px;
-    }
-    .katex-zone {
-      min-height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      overflow-x: auto;
-      padding: 4px 0;
-    }
-    .math-substitution {
-      font-family: monospace;
-      font-size: 11px;
-      color: #8b949e;
-      text-align: center;
-      word-break: break-all;
-      margin-bottom: 4px;
-    }
-    .math-result {
-      font-size: 14px;
-      font-weight: 500;
-      text-align: center;
-      color: #ffffff;
-      margin-bottom: 4px;
-    }
-    .bess-qty-container {
-      display: flex;
-      justify-content: center;
-      margin-top: 4px;
-      margin-bottom: 4px;
-    }
-    .bess-qty-value {
-      font-size: 16px;
-      font-weight: 700;
-      color: #00d992;
-      background-color: rgba(0, 217, 146, 0.1);
-      padding: 4px 12px;
-      border-radius: 4px;
-      border: 1px solid rgba(0, 217, 146, 0.2);
-    }
-    .warning-label {
-      background-color: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      color: #fbbf24;
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-    .energy-flow-list, .economic-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .energy-flow-list li, .economic-list li {
-      display: flex;
-      flex-direction: column;
-      border-bottom: 1px dashed #3d3a39;
-      padding-bottom: 4px;
-    }
-    .energy-flow-list li:last-child, .economic-list li:last-child {
-      border-bottom: none;
-    }
-    .energy-flow-list .label, .economic-list .label {
-      font-size: 11px;
-      color: #8b949e;
-    }
-    .energy-flow-list .value, .economic-list .value {
-      font-size: 14px;
-      font-weight: 600;
-      color: #ffffff;
-    }
-    .energy-flow-list .subtext {
-      font-size: 10.5px;
-      color: #8b949e;
-      font-style: italic;
-    }
-    .economic-list .savings-item {
-      border-top: 1px solid #3d3a39;
-      padding-top: 8px;
-      margin-top: 4px;
-      border-bottom: none;
-    }
-    .economic-list .value.highlight {
-      color: #00d992;
-      font-size: 18px;
-    }
-  `;
-  
-  let katexStyles = cachedKatexStyles;
-  if (!katexStyles) {
-    try {
-      for (const sheet of document.styleSheets) {
-        if (sheet.href && sheet.href.includes("katex")) {
-          for (const rule of sheet.cssRules) {
-            katexStyles += rule.cssText + "\n";
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Could not inline KaTeX styles automatically: ", e);
-    }
+// Mapeia cada seção de resultado para sua estratégia de exportação:
+// blocos HTML → html2canvas (PNG transparente) | gráficos → exportador nativo do ApexCharts
+function getExportCapture(sectionId) {
+  if (sectionId === 'linha-2') {
+    return captureElementPng(document.getElementById('rationale-capture'), null);
   }
-  
-  const clone = element.cloneNode(true);
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-  <foreignObject width="100%" height="100%">
-    <div xmlns="http://www.w3.org/1999/xhtml">
-      <style>
-        ${stylesText}
-        ${katexStyles}
-      </style>
-      <div class="rationale-grid">
-        ${clone.innerHTML}
-      </div>
-    </div>
-  </foreignObject>
-</svg>
-  `;
-  return svg.trim();
+  if (sectionId === 'linha-3-col1') {
+    return captureElementPng(document.querySelector('#diagram-container .flow-diagram'), null);
+  }
+  if (sectionId === 'linha-3-col2') {
+    return captureChartPng(bessCharts.loadCurve);
+  }
+  if (sectionId === 'linha-4-col1') {
+    return captureElementPng(document.querySelector('#unifilar-container .unifilar'), null);
+  }
+  if (sectionId === 'linha-4-col2') {
+    return captureChartPng(bessCharts.degradation);
+  }
+  return Promise.resolve(null);
 }
 
-function copyToClipboard(sectionId) {
-  let svgString = "";
-  if (sectionId === 'linha-2') {
-    svgString = getLinha2SvgString();
-  } else {
-    const svgEl = document.querySelector(`#${sectionId} svg`);
-    if (!svgEl) return;
-    svgString = new XMLSerializer().serializeToString(svgEl);
-  }
-  
-  if (!svgString) {
-    showToast("Não foi possível copiar");
-    return;
-  }
-  
-  let width = 800;
-  let height = 500;
-  if (sectionId === 'linha-2') {
-    const el = document.querySelector('#linha-2 .rationale-grid');
-    width = el ? (el.offsetWidth || 1200) : 1200;
-    height = el ? (el.offsetHeight || 400) : 400;
-  } else {
-    const svgEl = document.querySelector(`#${sectionId} svg`);
-    if (svgEl) {
-      const viewBox = svgEl.getAttribute('viewBox');
-      if (viewBox) {
-        const parts = viewBox.split(/\s+/).map(Number);
-        if (parts.length === 4) {
-          width = parts[2];
-          height = parts[3];
-        }
-      }
+// Copia a seção como PNG para a área de transferência
+async function copySectionPng(sectionId) {
+  try {
+    const capture = await getExportCapture(sectionId);
+    if (!capture || !capture.dataUrl) {
+      showToast("Calcule uma simulação antes de copiar");
+      return;
     }
-  }
-  
-  const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const URL = window.URL || window.webkitURL || window;
-  const blobURL = URL.createObjectURL(svgBlob);
-  
-  const img = new Image();
-  img.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, width, height); // Keep transparent background
-    ctx.drawImage(img, 0, 0);
-    
-    canvas.toBlob((blob) => {
-      URL.revokeObjectURL(blobURL);
-      if (!blob) {
-        showToast("Não foi possível copiar");
-        return;
-      }
-      
-      const item = new ClipboardItem({ "image/png": blob });
-      navigator.clipboard.write([item]).then(() => {
-        showToast("Copiado!", 2000);
-      }).catch((err) => {
-        console.error("Clipboard write error:", err);
-        showToast("Não foi possível copiar");
-      });
-    }, 'image/png');
-  };
-  img.onerror = (e) => {
-    console.error("Image loading error during clipboard copy:", e);
-    URL.revokeObjectURL(blobURL);
+
+    const blob = await (await fetch(capture.dataUrl)).blob();
+    const item = new ClipboardItem({ "image/png": blob });
+    await navigator.clipboard.write([item]);
+    showToast("Copiado!", 2000);
+  } catch (err) {
+    console.error("Erro ao copiar seção como PNG:", err);
     showToast("Não foi possível copiar");
-  };
-  img.src = blobURL;
+  }
 }
 
-function downloadSvg(sectionId, filename) {
-  let svgString = "";
-  if (sectionId === 'linha-2') {
-    svgString = getLinha2SvgString();
-  } else {
-    const svgEl = document.querySelector(`#${sectionId} svg`);
-    if (!svgEl) return;
-    svgString = new XMLSerializer().serializeToString(svgEl);
-  }
-  
-  if (!svgString) {
+// Baixa a seção como arquivo PNG
+async function downloadSectionPng(sectionId, filename) {
+  try {
+    const capture = await getExportCapture(sectionId);
+    if (!capture || !capture.dataUrl) {
+      showToast("Calcule uma simulação antes de baixar");
+      return;
+    }
+
+    const a = document.createElement('a');
+    a.href = capture.dataUrl;
+    a.download = filename || "bess-export.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err) {
+    console.error("Erro ao baixar seção como PNG:", err);
     showToast("Não foi possível baixar o arquivo");
-    return;
   }
-  
-  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || "bess-export.svg";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 function setupExportButtons(sectionId, copyBtnId, downloadBtnId, filename) {
   const copyBtn = document.getElementById(copyBtnId);
   const downloadBtn = document.getElementById(downloadBtnId);
-  
+
   if (copyBtn) {
-    copyBtn.addEventListener('click', () => copyToClipboard(sectionId));
+    copyBtn.addEventListener('click', () => copySectionPng(sectionId));
   }
   if (downloadBtn) {
-    downloadBtn.addEventListener('click', () => downloadSvg(sectionId, filename));
+    downloadBtn.addEventListener('click', () => downloadSectionPng(sectionId, filename));
   }
 }
 
 function setupResultEvents() {
-  setupExportButtons('linha-2', 'btn-copy-linha-2', 'btn-download-linha-2', 'bess-racional-dimensionamento.svg');
-  setupExportButtons('linha-3-col1', 'btn-copy-linha-3', 'btn-download-linha-3', 'bess-diagrama-funcionamento.svg');
-  setupExportButtons('linha-3-col2', 'btn-copy-linha-3-col2', 'btn-download-linha-3-col2', 'bess-curva-carga-24h.svg');
-  setupExportButtons('linha-4-col1', 'btn-copy-linha-4-col1', 'btn-download-linha-4-col1', 'bess-diagrama-unifilar.svg');
-  setupExportButtons('linha-4-col2', 'btn-copy-linha-4-col2', 'btn-download-linha-4-col2', 'bess-curva-degradacao.svg');
+  setupExportButtons('linha-2', 'btn-copy-linha-2', 'btn-download-linha-2', 'bess-racional-dimensionamento.png');
+  setupExportButtons('linha-3-col1', 'btn-copy-linha-3', 'btn-download-linha-3', 'bess-diagrama-funcionamento.png');
+  setupExportButtons('linha-3-col2', 'btn-copy-linha-3-col2', 'btn-download-linha-3-col2', 'bess-curva-carga-24h.png');
+  setupExportButtons('linha-4-col1', 'btn-copy-linha-4-col1', 'btn-download-linha-4-col1', 'bess-diagrama-unifilar.png');
+  setupExportButtons('linha-4-col2', 'btn-copy-linha-4-col2', 'btn-download-linha-4-col2', 'bess-curva-degradacao.png');
   
   const pdfBtn = document.getElementById('btn-pdf-report');
   if (pdfBtn) {

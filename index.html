@@ -13,10 +13,15 @@
   
   <!-- Supabase JS Client SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <!-- jsPDF and svg2pdf.js for PDF Report Export -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.0/dist/svg2pdf.umd.min.js" defer></script>
+
+  <!-- ApexCharts para gráficos interativos (curvas de carga e degradação) -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+  <!-- html2canvas para captura de blocos HTML como PNG (Copiar / Baixar / PDF) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- jsPDF (core) + autotable (plugin) para o relatório PDF -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js" defer></script>
 </head>
 <body>
@@ -245,7 +250,7 @@
               <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
             </svg>
           </button>
-          <button type="button" class="btn btn-icon" id="btn-download-linha-2" title="Baixar como SVG" aria-label="Baixar racional do cálculo como SVG">
+          <button type="button" class="btn btn-icon" id="btn-download-linha-2" title="Baixar como PNG" aria-label="Baixar racional do cálculo como PNG">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
               <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
               <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
@@ -254,18 +259,19 @@
         </div>
       </div>
       
-      <div class="rationale-grid">
+      <div class="rationale-grid" id="rationale-capture">
         <!-- Bloco 1: Dimensionamento -->
         <div class="rationale-block result-card" id="block-dimensionamento">
           <h4>Dimensionamento</h4>
-          <div class="katex-zone" id="formula-nom"></div>
-          <div class="math-substitution" id="sub-nom"></div>
-          <div class="math-result" id="result-nom"></div>
+          <code class="formula-badge">E_nom = E_ciclo / (DoD * RTE * η_sys)</code>
+          <div class="formula-substitution" id="sub-nom"></div>
+          <div class="metric-hero" id="result-nom"></div>
           <div class="bess-qty-container">
             <span class="bess-qty-value" id="bess-qty"></span>
           </div>
-          <div class="warning-label" id="warning-subdimensionado" style="display: none;">
-            ⚠️ Sistema subdimensionado. A capacidade instalada é inferior à necessária e a degradação comprometerá o desempenho antes do EOL previsto.
+          <div class="alert-banner" id="warning-subdimensionado" style="display: none;">
+            <span class="alert-banner__icon" aria-hidden="true">⚠️</span>
+            <span>Sistema subdimensionado. A capacidade instalada é inferior à necessária e a degradação comprometerá o desempenho antes do EOL previsto.</span>
           </div>
         </div>
         
@@ -330,7 +336,7 @@
                 <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
               </svg>
             </button>
-            <button type="button" class="btn btn-icon" id="btn-download-linha-3" title="Baixar como SVG" aria-label="Baixar diagrama de funcionamento como SVG">
+            <button type="button" class="btn btn-icon" id="btn-download-linha-3" title="Baixar como PNG" aria-label="Baixar diagrama de funcionamento como PNG">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
@@ -338,7 +344,7 @@
             </button>
           </div>
         </div>
-        <div class="svg-container" id="diagram-container">
+        <div class="diagram-container" id="diagram-container">
           <div class="chart-placeholder">Clique em CALCULAR para gerar o diagrama de funcionamento.</div>
         </div>
       </section>
@@ -354,7 +360,7 @@
                 <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
               </svg>
             </button>
-            <button type="button" class="btn btn-icon" id="btn-download-linha-3-col2" title="Baixar como SVG" aria-label="Baixar curva de carga 24h como SVG">
+            <button type="button" class="btn btn-icon" id="btn-download-linha-3-col2" title="Baixar como PNG" aria-label="Baixar curva de carga 24h como PNG">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
@@ -362,7 +368,7 @@
             </button>
           </div>
         </div>
-        <div class="svg-container" id="load-curve-container">
+        <div class="chart-container" id="load-curve-container">
           <div class="chart-placeholder">Clique em CALCULAR para visualizar a curva de carga de 24h.</div>
         </div>
       </section>
@@ -381,7 +387,7 @@
                 <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
               </svg>
             </button>
-            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col1" title="Baixar como SVG" aria-label="Baixar diagrama unifilar como SVG">
+            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col1" title="Baixar como PNG" aria-label="Baixar diagrama unifilar como PNG">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
@@ -389,7 +395,7 @@
             </button>
           </div>
         </div>
-        <div class="svg-container" id="unifilar-container">
+        <div class="diagram-container" id="unifilar-container">
           <div class="chart-placeholder">Clique em CALCULAR para gerar o diagrama unifilar elétrico.</div>
         </div>
       </section>
@@ -405,7 +411,7 @@
                 <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
               </svg>
             </button>
-            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col2" title="Baixar como SVG" aria-label="Baixar curva de degradação como SVG">
+            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col2" title="Baixar como PNG" aria-label="Baixar curva de degradação como PNG">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
@@ -413,7 +419,7 @@
             </button>
           </div>
         </div>
-        <div class="svg-container" id="degradation-container">
+        <div class="chart-container" id="degradation-container">
           <div class="chart-placeholder">Clique em CALCULAR para gerar a curva de degradação da bateria (SoH).</div>
         </div>
       </section>
