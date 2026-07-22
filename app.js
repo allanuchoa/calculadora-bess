@@ -424,77 +424,186 @@ function renderFlowDiagram(container, outputs, protectionType) {
   const eta_discharge = formatNumber(outputs.eta_discharge * 100, 2);
   const eta_system = formatNumber(outputs.eta_system * 100, 1);
   const lossPercent = formatNumber((1 - outputs.eta_system) * 100, 1);
+  const totalBessKwh = formatNumber(outputs.total_bess_energy_kwh, 0);
 
   container.innerHTML = `
-    <div class="flow-diagram" id="flow-diagram-capture">
-      <div class="func-diagram">
-        <div class="func-node func-node--rede">
-          <div class="node-card node-card--grid">
-            <span class="node-card__icon" aria-hidden="true">⚡</span>
-            <span class="node-card__title">Rede Concessionária</span>
-            <span class="node-card__sub">AC 3Φ</span>
-          </div>
-        </div>
-
-        <div class="func-link func-link--v1">
-          <div class="flow-vertical__line"></div>
-          <div class="flow-vertical__info">
-            <span class="flow-label flow-text--green">Carga (Fora de Ponta)</span>
-            <span class="flow-value"><code>E_consumida</code> = ${E_consumida} kWh</span>
-            <span class="flow-sub">Perdas de conexão: ${lossPercent}%</span>
-          </div>
-        </div>
-
-        <div class="func-node func-node--qgbt">
-          <div class="node-card node-card--accent">
-            <span class="node-card__icon" aria-hidden="true">🔀</span>
-            <span class="node-card__title">${protectionLabel}</span>
-            <span class="node-card__sub">Ponto de Conexão Comum</span>
-          </div>
-        </div>
-
-        <div class="func-link func-link--h">
-          <span class="flow-label flow-text--amber">Alimentação (HP)</span>
-          <div class="flow-line flow-line--amber flow-line--right"></div>
-          <span class="flow-value"><code>E_compensada</code> = ${E_compensada} kWh</span>
-          <span class="flow-sub">Rendimento: ${eta_system}%</span>
-        </div>
-
-        <div class="func-node func-node--cargas">
-          <div class="node-card">
-            <span class="node-card__icon" aria-hidden="true">🏭</span>
-            <span class="node-card__title">Cargas C&amp;I</span>
-            <span class="node-card__sub">Consumo Industrial</span>
-          </div>
-        </div>
-
-        <div class="func-link func-link--v2">
-          <div class="func-link__dual">
-            <div class="func-link__channel">
-              <div class="flow-vertical__line flow-vertical__line--sm flow-vertical__line--blue"></div>
-              <span class="flow-label flow-text--blue">Carga BESS</span>
-              <span class="flow-value"><code>E_carga</code> = ${E_carga} kWh</span>
-              <span class="flow-sub">η_carga = ${eta_charge}%</span>
-            </div>
-            <div class="func-link__channel">
-              <div class="flow-vertical__line flow-vertical__line--sm flow-vertical__line--amber flow-vertical__line--up"></div>
-              <span class="flow-label flow-text--amber">Descarga (HP)</span>
-              <span class="flow-value"><code>E_descarga</code> = ${E_descarga} kWh</span>
-              <span class="flow-sub">η_descarga = ${eta_discharge}%</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="func-node func-node--bess">
-          <div class="node-card node-card--bess">
-            <span class="node-card__icon" aria-hidden="true">🔋</span>
-            <span class="node-card__title">BESS (Baterias LFP)</span>
-            <span class="node-card__sub">Capacidade: ${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</span>
-          </div>
+    <div class="archify-flow-card" id="flow-diagram-capture">
+      <div class="archify-unifilar-header">
+        <div class="archify-unifilar-title">
+          <span class="archify-dot"></span>
+          <span class="archify-title-text">Diagrama de Fluxo de Energia (Load-Shifting)</span>
+          <span class="archify-tag">η_sistema = ${eta_system}%</span>
         </div>
       </div>
+      <div class="archify-svg-viewport">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 530" width="100%" height="100%" class="archify-unifilar-svg" id="flow-svg">
+          <defs>
+            <linearGradient id="flowBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#f0f7fc"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+            <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="100%" stop-color="#f8fafc"/>
+            </linearGradient>
+            <linearGradient id="bessCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e293b"/>
+              <stop offset="100%" stop-color="#0f172a"/>
+            </linearGradient>
+            <filter id="shadowFilter" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.08"/>
+            </filter>
+            <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#10b981" flood-opacity="0.6"/>
+            </filter>
+            <filter id="glowAmber" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#f59e0b" flood-opacity="0.6"/>
+            </filter>
+          </defs>
 
-      <div class="flow-diagram__caption">Diagrama de Fluxo de Energia por Ciclo (Load-Shifting)</div>
+          <!-- Background Canvas -->
+          <rect width="1020" height="530" fill="url(#flowBgGrad)" rx="10"/>
+
+          <!-- TOP RIGHT FLOW LEGEND -->
+          <g transform="translate(805, 12)">
+            <rect x="0" y="0" width="200" height="75" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <line x1="15" y1="20" x2="55" y2="20" stroke="#10b981" stroke-width="3.5" stroke-dasharray="6,3"/>
+            <text x="65" y="24" font-size="11" font-weight="600" fill="#334155">Carga FP (Rede)</text>
+            <line x1="15" y1="40" x2="55" y2="40" stroke="#f59e0b" stroke-width="3.5" stroke-dasharray="6,3"/>
+            <text x="65" y="44" font-size="11" font-weight="600" fill="#334155">Descarga BESS (HP)</text>
+            <line x1="15" y1="60" x2="55" y2="60" stroke="#00d992" stroke-width="3.5"/>
+            <text x="65" y="63" font-size="11" font-weight="600" fill="#334155">Alimentação Cargas (HP)</text>
+          </g>
+
+          <!-- WIRING PATHS & LINES -->
+
+          <!-- 1. CARGA FP PATH: Grid -> PCC -> BESS (Green #10b981) -->
+          <path d="M 210,85 L 435,85" stroke="#10b981" stroke-width="3.5" stroke-dasharray="6,3" fill="none" filter="url(#glowGreen)"/>
+          <path d="M 470,125 L 470,305" stroke="#10b981" stroke-width="3.5" stroke-dasharray="6,3" fill="none" filter="url(#glowGreen)"/>
+          <polygon points="470,308 464,296 476,296" fill="#10b981"/>
+
+          <!-- 2. DESCARGA HP PATH: BESS -> PCC -> Cargas C&I (Amber #f59e0b) -->
+          <path d="M 550,305 L 550,125" stroke="#f59e0b" stroke-width="3.5" stroke-dasharray="6,3" fill="none" filter="url(#glowAmber)"/>
+          <polygon points="550,122 544,134 556,134" fill="#f59e0b"/>
+          <path d="M 585,85 L 805,85" stroke="#00d992" stroke-width="3.5" stroke-dasharray="6,3" fill="none" filter="url(#glowAmber)"/>
+          <polygon points="808,85 796,79 796,91" fill="#00d992"/>
+
+          <!-- CALLOUT DATA CARDS -->
+
+          <!-- Callout 1: Carga FP (Grid to PCC) -->
+          <g transform="translate(230, 40)">
+            <rect x="0" y="0" width="180" height="42" rx="6" fill="#ffffff" stroke="#10b981" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <text x="10" y="16" font-size="10" font-weight="700" fill="#10b981">CARGA FORA DE PONTA</text>
+            <text x="10" y="32" font-size="11" font-weight="800" fill="#1e293b">E_consumida = ${E_consumida} kWh</text>
+          </g>
+
+          <!-- Callout 2: Carga BESS (PCC to BESS) -->
+          <g transform="translate(325, 195)">
+            <rect x="0" y="0" width="130" height="44" rx="6" fill="#ffffff" stroke="#10b981" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <text x="10" y="16" font-size="10" font-weight="700" fill="#0284c7">ENTRADA BESS</text>
+            <text x="10" y="30" font-size="10" font-weight="800" fill="#1e293b">E_carga = ${E_carga} kWh</text>
+            <text x="10" y="40" font-size="9" font-weight="600" fill="#64748b">η_carga = ${eta_charge}%</text>
+          </g>
+
+          <!-- Callout 3: Descarga BESS (BESS to PCC) -->
+          <g transform="translate(565, 195)">
+            <rect x="0" y="0" width="140" height="44" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <text x="10" y="16" font-size="10" font-weight="700" fill="#d97706">SAÍDA BESS (PONTAS)</text>
+            <text x="10" y="30" font-size="10" font-weight="800" fill="#1e293b">E_descarga = ${E_descarga} kWh</text>
+            <text x="10" y="40" font-size="9" font-weight="600" fill="#64748b">η_descarga = ${eta_discharge}%</text>
+          </g>
+
+          <!-- Callout 4: Abastecimento HP (PCC to Cargas C&I) -->
+          <g transform="translate(615, 40)">
+            <rect x="0" y="0" width="175" height="42" rx="6" fill="#ffffff" stroke="#00d992" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <text x="10" y="16" font-size="10" font-weight="700" fill="#059669">COMPENSAÇÃO EM PONTA</text>
+            <text x="10" y="32" font-size="11" font-weight="800" fill="#1e293b">E_compensada = ${E_compensada} kWh</text>
+          </g>
+
+          <!-- NODES -->
+
+          <!-- NODE 1: REDE CONCESSIONÁRIA (Top Left) -->
+          <g transform="translate(50, 45)">
+            <rect x="0" y="0" width="160" height="80" rx="8" fill="url(#cardGrad)" stroke="#64748b" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <circle cx="35" cy="40" r="22" fill="#0f172a"/>
+            <polygon points="35,24 25,52 45,52" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+            <line x1="20" y1="32" x2="50" y2="32" stroke="#38bdf8" stroke-width="1.5"/>
+            <text x="70" y="36" font-size="12" font-weight="800" fill="#0f172a">Rede AC</text>
+            <text x="70" y="52" font-size="10" font-weight="600" fill="#64748b">Concessionária</text>
+          </g>
+
+          <!-- NODE 2: PONTO DE CONEXÃO COMUM (Center Top) -->
+          <g transform="translate(435, 45)">
+            <rect x="0" y="0" width="150" height="80" rx="8" fill="#334155" stroke="#475569" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <circle cx="35" cy="40" r="20" fill="#0f172a"/>
+            <text x="35" y="45" font-size="16" text-anchor="middle">🔀</text>
+            <text x="65" y="35" font-size="12" font-weight="800" fill="#ffffff">${protectionLabel}</text>
+            <text x="65" y="52" font-size="10" font-weight="600" fill="#cbd5e1">PCC Conexão</text>
+          </g>
+
+          <!-- NODE 3: CARGAS C&I (Top Right) -->
+          <g transform="translate(805, 45)">
+            <rect x="0" y="0" width="160" height="80" rx="8" fill="url(#cardGrad)" stroke="#64748b" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <circle cx="35" cy="40" r="22" fill="#0f172a"/>
+            <text x="35" y="46" font-size="18" text-anchor="middle">🏭</text>
+            <text x="70" y="36" font-size="12" font-weight="800" fill="#0f172a">Cargas C&amp;I</text>
+            <text x="70" y="52" font-size="10" font-weight="600" fill="#64748b">Instalação</text>
+          </g>
+
+          <!-- NODE 4: SISTEMA BESS (Center Bottom) -->
+          <g transform="translate(370, 305)">
+            <rect x="0" y="0" width="280" height="135" rx="10" fill="url(#bessCardGrad)" stroke="#0284c7" stroke-width="2" filter="url(#shadowFilter)"/>
+            <rect x="0" y="0" width="280" height="28" rx="10" fill="#0284c7" opacity="0.2"/>
+            <text x="140" y="19" font-size="11" font-weight="800" fill="#38bdf8" letter-spacing="1" text-anchor="middle">SISTEMA BESS LIVOLTEK</text>
+            
+            <g transform="translate(20, 42)">
+              <rect x="0" y="0" width="45" height="75" rx="4" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+              <text x="22.5" y="42" font-size="10" font-weight="800" fill="#0f172a" text-anchor="middle" transform="rotate(-90 22.5 42)">LIVOLTEK</text>
+              <rect x="5" y="62" width="35" height="8" rx="1" fill="#10b981"/>
+            </g>
+
+            <g transform="translate(80, 42)">
+              <rect x="0" y="0" width="60" height="75" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+              <text x="30" y="16" font-size="9" font-weight="800" fill="#38bdf8" text-anchor="middle">PCS 3Φ</text>
+              <circle cx="30" cy="45" r="12" fill="#0f172a"/>
+              <circle cx="30" cy="45" r="8" fill="#10b981" filter="url(#glowGreen)"/>
+            </g>
+
+            <text x="155" y="62" font-size="12" font-weight="800" fill="#ffffff">Capacidade BESS</text>
+            <text x="155" y="80" font-size="16" font-weight="900" fill="#10b981">${totalBessKwh} kWh</text>
+            <text x="155" y="100" font-size="10" font-weight="600" fill="#94a3b8">Baterias LFP Nível II</text>
+          </g>
+
+          <!-- BOTTOM METRICS SUMMARY BAR -->
+          <g transform="translate(45, 465)">
+            <rect x="0" y="0" width="930" height="50" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            
+            <g transform="translate(20, 15)">
+              <text x="0" y="12" font-size="10" font-weight="700" fill="#64748b">ENERGIA CONSUMIDA DA REDE</text>
+              <text x="0" y="26" font-size="12" font-weight="900" fill="#0f172a">${E_consumida} kWh</text>
+            </g>
+            <line x1="240" y1="10" x2="240" y2="40" stroke="#e2e8f0" stroke-width="1.5"/>
+
+            <g transform="translate(265, 15)">
+              <text x="0" y="12" font-size="10" font-weight="700" fill="#64748b">ENERGIA CARREGADA NO BESS</text>
+              <text x="0" y="26" font-size="12" font-weight="900" fill="#0284c7">${E_carga} kWh</text>
+            </g>
+            <line x1="480" y1="10" x2="480" y2="40" stroke="#e2e8f0" stroke-width="1.5"/>
+
+            <g transform="translate(505, 15)">
+              <text x="0" y="12" font-size="10" font-weight="700" fill="#64748b">ENERGIA ENTREGUE NA PONTA</text>
+              <text x="0" y="26" font-size="12" font-weight="900" fill="#d97706">${E_compensada} kWh</text>
+            </g>
+            <line x1="720" y1="10" x2="720" y2="40" stroke="#e2e8f0" stroke-width="1.5"/>
+
+            <g transform="translate(745, 15)">
+              <text x="0" y="12" font-size="10" font-weight="700" fill="#64748b">RENDIMENTO GLOBAL (RTE)</text>
+              <text x="0" y="26" font-size="12" font-weight="900" fill="#10b981">${eta_system}%</text>
+            </g>
+          </g>
+
+        </svg>
+      </div>
     </div>
   `;
 }
@@ -2064,7 +2173,8 @@ function getExportCapture(sectionId) {
     return captureElementPng(document.getElementById('rationale-capture'), null);
   }
   if (sectionId === 'linha-3-col1') {
-    return captureElementPng(document.querySelector('#diagram-container .flow-diagram'), null);
+    const el = document.querySelector('#diagram-container .archify-flow-card') || document.querySelector('#diagram-container .flow-diagram');
+    return captureElementPng(el, null);
   }
   if (sectionId === 'linha-3-col2') {
     return captureChartPng(bessCharts.loadCurve);
@@ -2077,6 +2187,50 @@ function getExportCapture(sectionId) {
     return captureChartPng(bessCharts.degradation);
   }
   return Promise.resolve(null);
+}
+
+// Exporta o diagrama de funcionamento como arquivo JPEG com fundo sólido
+function downloadFlowJpeg() {
+  const el = document.querySelector('#diagram-container .archify-flow-card') || document.querySelector('#diagram-container');
+  if (!el || typeof html2canvas === 'undefined') {
+    showToast("Calcule uma simulação antes de baixar");
+    return;
+  }
+  html2canvas(el, { backgroundColor: '#ffffff', scale: 2, logging: false }).then(canvas => {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'bess-diagrama-funcionamento.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast("JPEG baixado com sucesso!");
+  }).catch(err => {
+    console.error("Erro ao exportar JPEG do fluxo:", err);
+    showToast("Não foi possível baixar o JPEG");
+  });
+}
+
+// Exporta o diagrama de funcionamento diretamente em vetor SVG puro
+function downloadFlowSvg() {
+  const svgEl = document.querySelector('#diagram-container svg');
+  if (!svgEl) {
+    showToast("Calcule uma simulação antes de baixar");
+    return;
+  }
+  const clone = svgEl.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const svgData = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bess-diagrama-funcionamento.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("SVG baixado com sucesso!");
 }
 
 // Exporta o diagrama unifilar como arquivo JPEG com fundo sólido
@@ -2182,6 +2336,17 @@ function setupResultEvents() {
   setupExportButtons('linha-4-col1', 'btn-copy-linha-4-col1', 'btn-download-linha-4-col1', 'bess-diagrama-unifilar.png');
   setupExportButtons('linha-4-col2', 'btn-copy-linha-4-col2', 'btn-download-linha-4-col2', 'bess-curva-degradacao.png');
   
+  // Handlers adicionais da toolbar dedicada do Diagrama de Funcionamento Archify
+  const btnCopyFlow = document.getElementById('btn-copy-flow');
+  const btnPngFlow = document.getElementById('btn-download-flow-png');
+  const btnJpgFlow = document.getElementById('btn-download-flow-jpg');
+  const btnSvgFlow = document.getElementById('btn-download-flow-svg');
+
+  if (btnCopyFlow) btnCopyFlow.addEventListener('click', () => copySectionPng('linha-3-col1'));
+  if (btnPngFlow) btnPngFlow.addEventListener('click', () => downloadSectionPng('linha-3-col1', 'bess-diagrama-funcionamento.png'));
+  if (btnJpgFlow) btnJpgFlow.addEventListener('click', downloadFlowJpeg);
+  if (btnSvgFlow) btnSvgFlow.addEventListener('click', downloadFlowSvg);
+
   // Handlers adicionais da toolbar dedicada do Diagrama Unifilar Archify
   const btnCopyUnifilar = document.getElementById('btn-copy-unifilar');
   const btnPngUnifilar = document.getElementById('btn-download-unifilar-png');
