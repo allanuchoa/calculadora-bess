@@ -379,19 +379,39 @@
       <!-- Coluna 1: Diagrama Unifilar -->
       <section id="linha-4-col1" class="result-section card" style="display: none;" role="region" aria-label="Diagrama Unifilar" aria-live="polite">
         <div class="result-section-header">
-          <h2>Diagrama Unifilar</h2>
-          <div class="btn-group export-bar">
-            <button type="button" class="btn btn-icon" id="btn-copy-linha-4-col1" title="Copiar como PNG" aria-label="Copiar diagrama unifilar como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <div class="title-with-badge">
+            <h2>Diagrama Unifilar Elétrico</h2>
+            <span class="badge badge--tech">Livoltek Archify System</span>
+          </div>
+          <div class="btn-group export-bar" id="unifilar-export-bar">
+            <button type="button" class="btn btn-icon btn-sm" id="btn-copy-unifilar" title="Copiar como PNG" aria-label="Copiar diagrama unifilar como PNG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                 <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
                 <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
               </svg>
+              <span>Copiar</span>
             </button>
-            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col1" title="Baixar como PNG" aria-label="Baixar diagrama unifilar como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <button type="button" class="btn btn-icon btn-sm" id="btn-download-unifilar-png" title="Baixar como PNG" aria-label="Baixar diagrama unifilar como PNG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
               </svg>
+              <span>PNG</span>
+            </button>
+            <button type="button" class="btn btn-icon btn-sm" id="btn-download-unifilar-jpg" title="Baixar como JPEG" aria-label="Baixar diagrama unifilar como JPEG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                <path d="M14.002 13h-12a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zm-12-1h12V4h-12v8z"/>
+                <path d="M10.648 7.646a.5.5 0 0 1 .577-.093l2.277 1.366V12h-11v-1.5l2.777-2.777a.5.5 0 0 1 .707 0l2.646 2.646 2.023-2.723z"/>
+              </svg>
+              <span>JPG</span>
+            </button>
+            <button type="button" class="btn btn-icon btn-sm" id="btn-download-unifilar-svg" title="Baixar como SVG" aria-label="Baixar diagrama unifilar como SVG">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
+                <path d="M4.5 12.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
+              </svg>
+              <span>SVG</span>
             </button>
           </div>
         </div>

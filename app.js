@@ -427,62 +427,70 @@ function renderFlowDiagram(container, outputs, protectionType) {
 
   container.innerHTML = `
     <div class="flow-diagram" id="flow-diagram-capture">
-      <div class="flow-diagram__top">
-        <div class="node-card node-card--grid">
-          <span class="node-card__icon" aria-hidden="true">⚡</span>
-          <span class="node-card__title">Rede Concessionária</span>
-          <span class="node-card__sub">AC 3Φ</span>
-        </div>
-      </div>
-
-      <div class="flow-vertical">
-        <div class="flow-vertical__line"></div>
-        <div class="flow-vertical__info">
-          <span class="flow-label flow-text--green">Carga (Fora de Ponta)</span>
-          <span class="flow-value"><code>E_consumida</code> = ${E_consumida} kWh</span>
-          <span class="flow-sub">Inclui perdas de conexão (${lossPercent}%)</span>
-        </div>
-      </div>
-
-      <div class="flow-diagram__middle">
-        <div class="node-card node-card--loads">
-          <span class="node-card__icon" aria-hidden="true">🏭</span>
-          <span class="node-card__title">Cargas C&amp;I</span>
-          <span class="node-card__sub">Consumo Industrial</span>
+      <div class="func-diagram">
+        <div class="func-node func-node--rede">
+          <div class="node-card node-card--grid">
+            <span class="node-card__icon" aria-hidden="true">⚡</span>
+            <span class="node-card__title">Rede Concessionária</span>
+            <span class="node-card__sub">AC 3Φ</span>
+          </div>
         </div>
 
-        <div class="flow-connector">
+        <div class="func-link func-link--v1">
+          <div class="flow-vertical__line"></div>
+          <div class="flow-vertical__info">
+            <span class="flow-label flow-text--green">Carga (Fora de Ponta)</span>
+            <span class="flow-value"><code>E_consumida</code> = ${E_consumida} kWh</span>
+            <span class="flow-sub">Perdas de conexão: ${lossPercent}%</span>
+          </div>
+        </div>
+
+        <div class="func-node func-node--qgbt">
+          <div class="node-card node-card--accent">
+            <span class="node-card__icon" aria-hidden="true">🔀</span>
+            <span class="node-card__title">${protectionLabel}</span>
+            <span class="node-card__sub">Ponto de Conexão Comum</span>
+          </div>
+        </div>
+
+        <div class="func-link func-link--h">
           <span class="flow-label flow-text--amber">Alimentação (HP)</span>
-          <div class="flow-line flow-line--amber flow-line--left"></div>
+          <div class="flow-line flow-line--amber flow-line--right"></div>
           <span class="flow-value"><code>E_compensada</code> = ${E_compensada} kWh</span>
           <span class="flow-sub">Rendimento: ${eta_system}%</span>
         </div>
 
-        <div class="node-card node-card--accent">
-          <span class="node-card__icon" aria-hidden="true">🔀</span>
-          <span class="node-card__title">${protectionLabel}</span>
-          <span class="node-card__sub">Ponto de Conexão Comum</span>
-        </div>
-
-        <div class="flow-connector flow-connector--dual">
-          <div class="flow-channel">
-            <span class="flow-label flow-text--blue">Carga BESS</span>
-            <div class="flow-line flow-line--blue flow-line--right"></div>
-            <span class="flow-value"><code>E_carga</code> = ${E_carga} kWh</span>
-            <span class="flow-sub">η_carga = ${eta_charge}%</span>
-          </div>
-          <div class="flow-channel">
-            <span class="flow-label flow-text--amber">Descarga (HP)</span>
-            <div class="flow-line flow-line--amber flow-line--left"></div>
-            <span class="flow-value"><code>E_descarga</code> = ${E_descarga} kWh</span>
-            <span class="flow-sub">η_descarga = ${eta_discharge}%</span>
+        <div class="func-node func-node--cargas">
+          <div class="node-card">
+            <span class="node-card__icon" aria-hidden="true">🏭</span>
+            <span class="node-card__title">Cargas C&amp;I</span>
+            <span class="node-card__sub">Consumo Industrial</span>
           </div>
         </div>
 
-        <div class="node-card node-card--bess">
-          <span class="node-card__icon" aria-hidden="true">🔋</span>
-          <span class="node-card__title">BESS (Baterias LFP)</span>
-          <span class="node-card__sub">Capacidade: ${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</span>
+        <div class="func-link func-link--v2">
+          <div class="func-link__dual">
+            <div class="func-link__channel">
+              <div class="flow-vertical__line flow-vertical__line--sm flow-vertical__line--blue"></div>
+              <span class="flow-label flow-text--blue">Carga BESS</span>
+              <span class="flow-value"><code>E_carga</code> = ${E_carga} kWh</span>
+              <span class="flow-sub">η_carga = ${eta_charge}%</span>
+            </div>
+            <div class="func-link__channel">
+              <div class="flow-vertical__line flow-vertical__line--sm flow-vertical__line--amber flow-vertical__line--up"></div>
+              <span class="flow-label flow-text--amber">Descarga (HP)</span>
+              <span class="flow-value"><code>E_descarga</code> = ${E_descarga} kWh</span>
+              <span class="flow-sub">η_descarga = ${eta_discharge}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="func-node func-node--bess">
+          <div class="node-card node-card--bess">
+            <span class="node-card__icon" aria-hidden="true">🔋</span>
+            <span class="node-card__title">BESS (Baterias LFP)</span>
+            <span class="node-card__sub">Capacidade: ${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</span>
+          </div>
         </div>
       </div>
 
@@ -517,23 +525,32 @@ function renderLoadCurve(container, outputs, inputs) {
     return endHP > startHP ? (h >= startHP && h < startHP + 3) : (h >= startHP || h < endHP);
   }
 
-  // 1. Coletar horas fora do HP e ordená-las por demanda (carga base) crescente
-  const nonHPHours = [];
-  for (let h = 0; h < 24; h++) {
-    if (!isHP(h)) {
-      nonHPHours.push({ hour: h, demand: baseLoad[h] });
+  // 1. Determinar N (duração da carga): ~6h contínuas ou mais se a potência do BESS for limitante
+  const nonHPHourCount = baseLoad.reduce((count, _, h) => count + (isHP(h) ? 0 : 1), 0);
+  const minHoursRequired = Math.ceil(outputs.consumed_energy_kwh / outputs.total_bess_power_kw);
+  const N = Math.min(Math.max(6, minHoursRequired), nonHPHourCount);
+
+  // 2. Buscar a janela CONTÍNUA de N horas (fora do HP) com a menor demanda média —
+  // carregamento real do BESS ocorre em bloco constante, não em horas avulsas
+  let bestStart = 0;
+  let bestSum = Infinity;
+  for (let start = 0; start < 24; start++) {
+    let sum = 0;
+    let valid = true;
+    for (let i = 0; i < N; i++) {
+      const hr = (start + i) % 24;
+      if (isHP(hr)) { valid = false; break; }
+      sum += baseLoad[hr];
+    }
+    if (valid && sum < bestSum) {
+      bestSum = sum;
+      bestStart = start;
     }
   }
-  nonHPHours.sort((a, b) => a.demand - b.demand);
 
-  // 2. Determinar N (duração da carga): ~5-6h ou mais se a potência do BESS for limitante
-  const minHoursRequired = Math.ceil(outputs.consumed_energy_kwh / outputs.total_bess_power_kw);
-  const N = Math.min(Math.max(6, minHoursRequired), nonHPHours.length);
-
-  // 3. Selecionar as primeiras N horas com menor demanda
   const chargeHoursSet = new Set();
   for (let i = 0; i < N; i++) {
-    chargeHoursSet.add(nonHPHours[i].hour);
+    chargeHoursSet.add((bestStart + i) % 24);
   }
 
   const P_carga = outputs.consumed_energy_kwh / N;
@@ -627,7 +644,7 @@ function renderLoadCurve(container, outputs, inputs) {
     ],
     colors: [colorPrimary, '#a78bfa'],
     stroke: {
-      curve: 'smooth',
+      curve: 'straight',
       width: [3, 2.5],
       dashArray: [0, 6]
     },
@@ -699,80 +716,311 @@ function renderLoadCurve(container, outputs, inputs) {
  * SEÇÃO 5: UNIFILAR — Diagrama unifilar em HTML/CSS
  * ==================================================================== */
 
+/* ====================================================================
+ * SEÇÃO 5: UNIFILAR — Diagrama unifilar com Arquitetura Archify (SVG)
+ * ==================================================================== */
+
 function renderUnifilar(container, outputs, inputs) {
   if (!container) return;
 
-  const protectionType = inputs['equipamento-protecao'] || 'ATS';
-  const protectionLabel = (protectionType === 'ATS') ? 'Chave ATS' : 'Barramento QGBT';
+  const totalBessKwh = (outputs && outputs.total_bess_energy_kwh) ? outputs.total_bess_energy_kwh : 1000;
+  const numCabinets = Math.min(5, Math.max(3, Math.ceil(totalBessKwh / 300)));
+  const bessCabinetsSvg = [];
+
+  const startX = 32;
+  const cabWidth = 70;
+  const gap = 12;
+
+  for (let i = 0; i < numCabinets; i++) {
+    const cabX = startX + i * (cabWidth + gap);
+    const isParallelBridge = (i === numCabinets - 1 && numCabinets > 3);
+    
+    bessCabinetsSvg.push(`
+      <g class="bess-cabinet-node" transform="translate(${cabX}, 215)">
+        <rect x="0" y="0" width="${cabWidth}" height="220" rx="4" fill="url(#bessCabinetGrad)" stroke="#94a3b8" stroke-width="1.5" filter="url(#shadowFilter)"/>
+        <rect x="2" y="2" width="${cabWidth - 4}" height="216" rx="3" fill="none" stroke="#ffffff" stroke-width="1"/>
+        
+        <text x="${cabWidth - 14}" y="110" font-size="10" font-weight="800" fill="#334155" letter-spacing="3" transform="rotate(-90 ${cabWidth - 14} 110)">LIVOLTEK</text>
+        
+        <circle cx="12" cy="20" r="3" fill="#ef4444"/>
+        <circle cx="12" cy="32" r="2.5" fill="#10b981"/>
+        <circle cx="12" cy="42" r="2.5" fill="#f59e0b"/>
+        <circle cx="12" cy="52" r="2.5" fill="#ef4444"/>
+        
+        <rect x="7" y="105" width="4" height="22" rx="1" fill="#475569"/>
+        
+        <polygon points="12,165 22,180 2,180" fill="#f59e0b" stroke="#d97706" stroke-width="1"/>
+        <text x="12" y="177" font-size="8" font-weight="bold" fill="#000" text-anchor="middle">!</text>
+        
+        <rect x="5" y="192" width="${cabWidth - 10}" height="20" rx="2" fill="#1e293b"/>
+        <line x1="8" y1="196" x2="${cabWidth - 8}" y2="196" stroke="#475569" stroke-width="1.5"/>
+        <line x1="8" y1="200" x2="${cabWidth - 8}" y2="200" stroke="#475569" stroke-width="1.5"/>
+        <line x1="8" y1="204" x2="${cabWidth - 8}" y2="204" stroke="#475569" stroke-width="1.5"/>
+        <line x1="8" y1="208" x2="${cabWidth - 8}" y2="208" stroke="#475569" stroke-width="1.5"/>
+      </g>
+    `);
+    
+    if (isParallelBridge) {
+      const bridgeX1 = cabX - gap + 2;
+      const bridgeX2 = cabX - 2;
+      bessCabinetsSvg.push(`
+        <line x1="${bridgeX1}" y1="325" x2="${bridgeX2}" y2="325" stroke="#334155" stroke-width="2" stroke-dasharray="3,3"/>
+      `);
+    }
+  }
 
   container.innerHTML = `
-    <div class="unifilar" id="unifilar-capture">
-      <div class="node-card node-card--grid">
-        <span class="node-card__icon" aria-hidden="true">⚡</span>
-        <span class="node-card__title">Rede Concessionária</span>
-        <span class="node-card__sub">AC 3Φ — Média Tensão</span>
-      </div>
-
-      <div class="uni-wire uni-wire--ac"></div>
-
-      <div class="node-card">
-        <span class="node-card__icon" aria-hidden="true">📟</span>
-        <span class="node-card__title">Medidor</span>
-        <span class="node-card__sub">Medidor Inteligente</span>
-      </div>
-
-      <div class="uni-wire uni-wire--ac"></div>
-
-      <div class="node-card node-card--accent">
-        <span class="node-card__icon" aria-hidden="true">🔀</span>
-        <span class="node-card__title">${protectionLabel}</span>
-        <span class="node-card__sub">Ponto de Conexão</span>
-      </div>
-
-      <div class="uni-branch" aria-hidden="true"></div>
-
-      <div class="uni-row">
-        <div class="uni-col">
-          <div class="node-card node-card--loads">
-            <span class="node-card__icon" aria-hidden="true">🏭</span>
-            <span class="node-card__title">Cargas C&amp;I</span>
-            <span class="node-card__sub">Consumo Instalado</span>
-          </div>
-          <div class="uni-wire uni-wire--comm uni-wire--tall"></div>
-          <div class="node-card node-card--comm">
-            <span class="node-card__icon" aria-hidden="true">🖥️</span>
-            <span class="node-card__title">Controlador EMS</span>
-            <span class="node-card__sub">Gestão Local</span>
-          </div>
-        </div>
-
-        <div class="uni-col">
-          <div class="node-card">
-            <span class="node-card__icon" aria-hidden="true">🔄</span>
-            <span class="node-card__title">PCS (Inversor)</span>
-            <span class="node-card__sub">Bidirecional</span>
-          </div>
-          <div class="uni-wire-labeled">
-            <div class="uni-wire uni-wire--dc uni-wire--tall"></div>
-            <span class="uni-wire-label uni-text--dc">Barramento CC</span>
-          </div>
-          <div class="node-card node-card--bess">
-            <span class="node-card__icon" aria-hidden="true">🔋</span>
-            <span class="node-card__title">Bateria LFP</span>
-            <span class="node-card__sub">${formatNumber(outputs.total_bess_energy_kwh, 0)} kWh</span>
-          </div>
+    <div class="archify-unifilar-card" id="unifilar-capture">
+      <div class="archify-unifilar-header">
+        <div class="archify-unifilar-title">
+          <span class="archify-dot"></span>
+          <span class="archify-title-text">Sistema BESS Livoltek &amp; Fotovoltaico</span>
+          <span class="archify-tag">${formatNumber(totalBessKwh, 0)} kWh Total</span>
         </div>
       </div>
+      <div class="archify-svg-viewport">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 530" width="100%" height="100%" class="archify-unifilar-svg" id="unifilar-svg">
+          <defs>
+            <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#f0f7fc"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+            <linearGradient id="bessCabinetGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="70%" stop-color="#f1f5f9"/>
+              <stop offset="100%" stop-color="#e2e8f0"/>
+            </linearGradient>
+            <linearGradient id="inverterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="100%" stop-color="#f8fafc"/>
+            </linearGradient>
+            <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#0284c7"/>
+            </linearGradient>
+            <filter id="shadowFilter" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.08"/>
+            </filter>
+            <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#10b981" flood-opacity="0.8"/>
+            </filter>
+          </defs>
 
-      <div class="uni-comm-link" aria-hidden="true">
-        <div class="uni-comm-link__line"></div>
-        <span class="uni-comm-link__label">Modbus TCP / RS485</span>
-      </div>
+          <!-- Diagram Canvas Base Background -->
+          <rect width="1020" height="530" fill="url(#bgGradient)" rx="10"/>
 
-      <div class="uni-legend">
-        <span class="uni-legend__item"><span class="uni-legend__swatch uni-legend__swatch--ac"></span>Fiação AC</span>
-        <span class="uni-legend__item"><span class="uni-legend__swatch uni-legend__swatch--dc"></span>Fiação DC</span>
-        <span class="uni-legend__item"><span class="uni-legend__swatch uni-legend__swatch--comm"></span>Comunicação</span>
+          <!-- LEGEND TOP RIGHT -->
+          <g transform="translate(825, 12)">
+            <rect x="0" y="0" width="180" height="70" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <line x1="15" y1="20" x2="55" y2="20" stroke="#0072ff" stroke-width="3.5"/>
+            <text x="65" y="24" font-size="12" font-weight="600" fill="#334155">DC</text>
+            <line x1="15" y1="40" x2="55" y2="40" stroke="#ff2d2d" stroke-width="3.5"/>
+            <text x="65" y="44" font-size="12" font-weight="600" fill="#334155">AC</text>
+            <line x1="15" y1="58" x2="55" y2="58" stroke="#0099ff" stroke-width="2.5" stroke-dasharray="5,3"/>
+            <text x="65" y="61" font-size="11" font-weight="600" fill="#334155">Communication</text>
+          </g>
+
+          <!-- 1. PV PANELS (Top Left) -->
+          <g class="pv-group" transform="translate(25, 50)">
+            <polygon points="5,40 30,10 65,10 40,40" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5"/>
+            <line x1="17.5" y1="25" x2="52.5" y2="25" stroke="#38bdf8" stroke-width="1"/>
+            <line x1="35" y1="10" x2="22.5" y2="40" stroke="#38bdf8" stroke-width="1"/>
+            
+            <polygon points="45,40 70,10 105,10 80,40" fill="#0284c7" stroke="#38bdf8" stroke-width="1.5"/>
+            <line x1="57.5" y1="25" x2="92.5" y2="25" stroke="#38bdf8" stroke-width="1"/>
+            <line x1="75" y1="10" x2="62.5" y2="40" stroke="#38bdf8" stroke-width="1"/>
+
+            <circle cx="8" cy="8" r="5" fill="#f59e0b"/>
+            <line x1="8" y1="1" x2="8" y2="0" stroke="#f59e0b" stroke-width="1.5"/>
+            <line x1="8" y1="15" x2="8" y2="16" stroke="#f59e0b" stroke-width="1.5"/>
+            <line x1="1" y1="8" x2="0" y2="8" stroke="#f59e0b" stroke-width="1.5"/>
+            <line x1="15" y1="8" x2="16" y2="8" stroke="#f59e0b" stroke-width="1.5"/>
+
+            <text x="55" y="58" font-size="14" font-weight="700" fill="#1e293b" text-anchor="middle">PV</text>
+          </g>
+
+          <!-- 2. GRID-TIED SYSTEM BOX -->
+          <rect x="165" y="30" width="280" height="115" rx="10" fill="rgba(59, 130, 246, 0.03)" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,4"/>
+          <text x="305" y="138" font-size="12" font-weight="600" fill="#3b82f6" text-anchor="middle">Grid-tied System</text>
+
+          <!-- Inverter 1 -->
+          <g transform="translate(185, 45)">
+            <rect x="0" y="0" width="105" height="68" rx="5" fill="url(#inverterGrad)" stroke="#94a3b8" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <text x="52.5" y="18" font-size="9" font-weight="800" fill="#475569" letter-spacing="2" text-anchor="middle">LIVOLTEK</text>
+            <circle cx="52.5" cy="40" r="9" fill="#0f172a"/>
+            <circle cx="52.5" cy="40" r="6" fill="#10b981" filter="url(#glowGreen)"/>
+            <path d="M 52.5,36 L 52.5,40" stroke="#ffffff" stroke-width="1.5"/>
+            <rect x="15" y="60" width="75" height="4" fill="#334155" rx="1"/>
+            <rect x="10" y="68" width="6" height="4" fill="#64748b"/>
+            <rect x="89" y="68" width="6" height="4" fill="#64748b"/>
+          </g>
+
+          <!-- Parallel line between inverters -->
+          <line x1="290" y1="80" x2="315" y2="80" stroke="#475569" stroke-width="1.5" stroke-dasharray="3,3"/>
+
+          <!-- Inverter 2 -->
+          <g transform="translate(315, 45)">
+            <rect x="0" y="0" width="105" height="68" rx="5" fill="url(#inverterGrad)" stroke="#94a3b8" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <text x="52.5" y="18" font-size="9" font-weight="800" fill="#475569" letter-spacing="2" text-anchor="middle">LIVOLTEK</text>
+            <circle cx="52.5" cy="40" r="9" fill="#0f172a"/>
+            <circle cx="52.5" cy="40" r="6" fill="#10b981" filter="url(#glowGreen)"/>
+            <path d="M 52.5,36 L 52.5,40" stroke="#ffffff" stroke-width="1.5"/>
+            <rect x="15" y="60" width="75" height="4" fill="#334155" rx="1"/>
+            <rect x="10" y="68" width="6" height="4" fill="#64748b"/>
+            <rect x="89" y="68" width="6" height="4" fill="#64748b"/>
+          </g>
+
+          <!-- 3. LIVOLTEK BESS SYSTEM BOX -->
+          <rect x="15" y="195" width="425" height="280" rx="10" fill="rgba(59, 130, 246, 0.03)" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6,4"/>
+          <text x="227" y="465" font-size="13" font-weight="700" fill="#3b82f6" text-anchor="middle">Livoltek BESS System</text>
+
+          <!-- BESS Cabinets rendered dynamically -->
+          ${bessCabinetsSvg.join('')}
+
+          <!-- 4. PV CABINET -->
+          <g transform="translate(485, 55)">
+            <rect x="0" y="0" width="70" height="85" rx="5" fill="#334155" stroke="#475569" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <circle cx="35" cy="38" r="16" fill="#0f172a" stroke="#64748b" stroke-width="1"/>
+            <path d="M 36,28 L 28,40 L 34,40 L 32,48 L 42,35 L 35,35 Z" fill="#f59e0b"/>
+            <line x1="15" y1="68" x2="55" y2="68" stroke="#94a3b8" stroke-width="2"/>
+            <line x1="15" y1="73" x2="55" y2="73" stroke="#94a3b8" stroke-width="2"/>
+            <text x="35" y="103" font-size="12" font-weight="600" fill="#1e293b" text-anchor="middle">PV Cabinet</text>
+          </g>
+
+          <!-- 5. iEMS -->
+          <g transform="translate(535, 270)">
+            <rect x="0" y="0" width="85" height="55" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" filter="url(#shadowFilter)"/>
+            <rect x="15" y="12" width="55" height="30" rx="3" fill="#1e293b"/>
+            <rect x="20" y="16" width="20" height="8" rx="1" fill="#38bdf8"/>
+            <circle cx="50" cy="20" r="2" fill="#10b981"/>
+            <circle cx="58" cy="20" r="2" fill="#f59e0b"/>
+            <rect x="20" y="30" width="6" height="6" fill="#64748b"/>
+            <rect x="30" y="30" width="6" height="6" fill="#64748b"/>
+            <rect x="40" y="30" width="6" height="6" fill="#64748b"/>
+            <text x="42.5" y="72" font-size="12" font-weight="600" fill="#1e293b" text-anchor="middle">iEMS</text>
+          </g>
+
+          <!-- 6. APP / WEB -->
+          <g transform="translate(675, 45)">
+            <path d="M 30,22 Q 22,12 35,10 Q 42,2 54,8 Q 66,2 72,12 Q 82,14 80,26 Q 80,34 68,34 L 28,34 Q 18,34 20,24 Z" fill="#0284c7" opacity="0.9"/>
+            <path d="M 68,14 A 8 8 0 0 1 76,22" stroke="#ffffff" stroke-width="2" fill="none"/>
+            <path d="M 71,17 A 4 4 0 0 1 75,21" stroke="#ffffff" stroke-width="2" fill="none"/>
+            <rect x="15" y="30" width="50" height="32" rx="3" fill="#0f172a" stroke="#0284c7" stroke-width="1.5"/>
+            <rect x="18" y="33" width="44" height="24" fill="#38bdf8" opacity="0.2"/>
+            <polygon points="35,62 45,62 40,68" fill="#475569"/>
+            <rect x="30" y="68" width="20" height="3" fill="#475569" rx="1"/>
+            <rect x="62" y="38" width="16" height="26" rx="2" fill="#0f172a" stroke="#0284c7" stroke-width="1.5"/>
+            <rect x="64" y="41" width="12" height="18" fill="#38bdf8" opacity="0.3"/>
+            <text x="42.5" y="88" font-size="12" font-weight="600" fill="#1e293b" text-anchor="middle">App/Web</text>
+          </g>
+
+          <!-- 7. TS CABINET (Central Hub) -->
+          <g transform="translate(610, 240)">
+            <rect x="0" y="0" width="65" height="235" rx="4" fill="url(#bessCabinetGrad)" stroke="#64748b" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <rect x="3" y="3" width="59" height="229" rx="2" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+            <rect x="8" y="15" width="49" height="190" rx="2" fill="#0f172a" opacity="0.85"/>
+            <rect x="12" y="20" width="41" height="180" fill="url(#glassGrad)" opacity="0.4"/>
+            <text x="32.5" y="125" font-size="10" font-weight="800" fill="#ffffff" letter-spacing="3" transform="rotate(-90 32.5 125)" opacity="0.8">LIVOLTEK</text>
+            <rect x="52" y="110" width="3" height="18" rx="1" fill="#cbd5e1"/>
+            <rect x="0" y="225" width="65" height="10" fill="#1e293b" rx="1"/>
+            <text x="32.5" y="252" font-size="12" font-weight="700" fill="#1e293b" text-anchor="middle">TS Cabinet</text>
+          </g>
+
+          <!-- 8. CONTACTOR -->
+          <g transform="translate(705, 225)">
+            <rect x="0" y="0" width="75" height="40" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" filter="url(#shadowFilter)"/>
+            <rect x="22" y="8" width="30" height="24" rx="2" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+            <line x1="28" y1="14" x2="46" y2="14" stroke="#475569" stroke-width="1.5"/>
+            <line x1="28" y1="20" x2="46" y2="20" stroke="#475569" stroke-width="1.5"/>
+            <line x1="28" y1="26" x2="46" y2="26" stroke="#475569" stroke-width="1.5"/>
+            <circle cx="37" cy="20" r="3" fill="#ef4444"/>
+            <text x="37.5" y="55" font-size="12" font-weight="600" fill="#1e293b" text-anchor="middle">Contactor</text>
+          </g>
+
+          <!-- 9. SMART METER -->
+          <g transform="translate(705, 325)">
+            <rect x="0" y="0" width="75" height="40" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" filter="url(#shadowFilter)"/>
+            <rect x="20" y="8" width="35" height="24" rx="2" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+            <rect x="24" y="11" width="27" height="10" fill="#10b981" opacity="0.3"/>
+            <text x="37.5" y="18" font-size="7" font-weight="bold" fill="#10b981" text-anchor="middle">230.5V</text>
+            <circle cx="26" cy="27" r="1.5" fill="#38bdf8"/>
+            <circle cx="32" cy="27" r="1.5" fill="#f59e0b"/>
+            <circle cx="38" cy="27" r="1.5" fill="#ef4444"/>
+            <text x="37.5" y="55" font-size="12" font-weight="600" fill="#1e293b" text-anchor="middle">Smart Meter</text>
+          </g>
+
+          <!-- 10. TRANSFORMER -->
+          <g transform="translate(825, 220)">
+            <rect x="0" y="0" width="75" height="60" rx="4" fill="#475569" stroke="#334155" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <circle cx="28" cy="30" r="16" fill="none" stroke="#e2e8f0" stroke-width="2.5"/>
+            <circle cx="47" cy="30" r="16" fill="none" stroke="#e2e8f0" stroke-width="2.5"/>
+            <rect x="15" y="-6" width="6" height="6" fill="#94a3b8"/>
+            <rect x="35" y="-6" width="6" height="6" fill="#94a3b8"/>
+            <rect x="55" y="-6" width="6" height="6" fill="#94a3b8"/>
+            <text x="37.5" y="78" font-size="12" font-weight="600" fill="#1e293b" text-anchor="middle">Transformer</text>
+          </g>
+
+          <!-- 11. GRID (Tower) -->
+          <g transform="translate(935, 215)">
+            <polygon points="27,5 12,65 42,65" fill="none" stroke="#1e293b" stroke-width="2.5"/>
+            <line x1="5" y1="20" x2="49" y2="20" stroke="#1e293b" stroke-width="2"/>
+            <line x1="2" y1="35" x2="52" y2="35" stroke="#1e293b" stroke-width="2"/>
+            <line x1="12" y1="65" x2="42" y2="35" stroke="#1e293b" stroke-width="1.5"/>
+            <line x1="42" y1="65" x2="12" y2="35" stroke="#1e293b" stroke-width="1.5"/>
+            <polygon points="27,10 20,20 34,20" fill="none" stroke="#1e293b" stroke-width="1.5"/>
+            <circle cx="27" cy="48" r="8" fill="#ef4444"/>
+            <path d="M 28,43 L 23,49 L 27,49 L 25,53 L 31,46 L 27,46 Z" fill="#ffffff"/>
+            <text x="27" y="80" font-size="12" font-weight="700" fill="#1e293b" text-anchor="middle">Grid</text>
+          </g>
+
+          <!-- 12. GEN (Generator) -->
+          <g transform="translate(825, 320)">
+            <rect x="0" y="0" width="75" height="55" rx="4" fill="#334155" stroke="#475569" stroke-width="1.5" filter="url(#shadowFilter)"/>
+            <rect x="10" y="10" width="55" height="35" rx="3" fill="#1e293b"/>
+            <circle cx="28" cy="27" r="10" fill="none" stroke="#f59e0b" stroke-width="2"/>
+            <text x="28" y="31" font-size="11" font-weight="bold" fill="#f59e0b" text-anchor="middle">G</text>
+            <circle cx="52" cy="22" r="5" fill="#0f172a" stroke="#64748b" stroke-width="1"/>
+            <line x1="52" y1="22" x2="55" y2="19" stroke="#ef4444" stroke-width="1.5"/>
+            <rect x="62" y="-4" width="5" height="14" rx="1" fill="#64748b"/>
+            <text x="37.5" y="72" font-size="12" font-weight="600" fill="#1e293b" text-anchor="middle">GEN</text>
+          </g>
+
+          <!-- 13. C&I LOADS -->
+          <g transform="translate(740, 435)">
+            <path d="M 10,60 L 10,25 L 25,35 L 25,25 L 40,35 L 40,25 L 55,35 L 55,60 Z" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+            <polygon points="10,25 25,15 40,25" fill="#0284c7" stroke="#38bdf8" stroke-width="1"/>
+            <rect x="30" y="42" width="10" height="18" fill="#f59e0b"/>
+            <rect x="16" y="42" width="8" height="8" fill="#38bdf8" opacity="0.6"/>
+            <rect x="44" y="42" width="8" height="8" fill="#38bdf8" opacity="0.6"/>
+            <rect x="60" y="35" width="16" height="25" rx="2" fill="#334155" stroke="#64748b" stroke-width="1"/>
+            <path d="M 68,40 L 64,48 L 68,48 L 66,54 L 72,45 L 68,45 Z" fill="#ef4444"/>
+            <text x="37.5" y="76" font-size="12" font-weight="700" fill="#1e293b" text-anchor="middle">C&amp;I Loads</text>
+          </g>
+
+          <!-- WIRING CONNECTIONS -->
+          <!-- DC WIRING (Blue #0072ff) -->
+          <path d="M 125,80 L 185,80" stroke="#0072ff" stroke-width="3.5" fill="none"/>
+
+          <!-- AC WIRING (Red #ff2d2d) -->
+          <path d="M 420,80 L 485,80" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 555,80 L 642,80 L 642,240" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 440,355 L 610,355" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 675,245 L 705,245" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 780,245 L 825,245" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 900,245 L 935,245" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 825,345 L 780,345" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 705,345 L 675,345" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+          <path d="M 642,475 L 642,467 L 740,467" stroke="#ff2d2d" stroke-width="3.5" fill="none"/>
+
+          <!-- COMMUNICATION WIRING (Dashed Blue #0099ff) -->
+          <path d="M 237,45 L 237,20 L 690,20" stroke="#0099ff" stroke-width="2.5" stroke-dasharray="5,3" fill="none"/>
+          <path d="M 367,45 L 367,20" stroke="#0099ff" stroke-width="2.5" stroke-dasharray="5,3" fill="none"/>
+          <path d="M 690,20 L 690,45" stroke="#0099ff" stroke-width="2.5" stroke-dasharray="5,3" fill="none"/>
+          <path d="M 565,20 L 565,270" stroke="#0099ff" stroke-width="2.5" stroke-dasharray="5,3" fill="none"/>
+          <path d="M 440,270 L 535,270" stroke="#0099ff" stroke-width="2.5" stroke-dasharray="5,3" fill="none"/>
+          <path d="M 620,295 L 640,295 M 620,270 L 645,270 L 645,80 L 675,80" stroke="#0099ff" stroke-width="2.5" stroke-dasharray="5,3" fill="none"/>
+
+        </svg>
       </div>
     </div>
   `;
@@ -816,7 +1064,7 @@ function renderDegradationChart(container, outputs, inputs) {
       { name: '0.5P (Datasheet)', data: toSeries(curves['0.5P']) }
     ],
     colors: [colorPrimary, '#f59e0b', '#ef4444'],
-    stroke: { curve: 'smooth', width: 2.5 },
+    stroke: { curve: 'straight', width: 2.5 },
     fill: {
       type: 'gradient',
       gradient: {
@@ -832,7 +1080,7 @@ function renderDegradationChart(container, outputs, inputs) {
       strokeDashArray: 3,
       padding: { top: 10 }
     },
-    markers: { size: 0, hover: { size: 5 } },
+    markers: { size: 3, hover: { size: 5 }, strokeWidth: 0 },
     xaxis: {
       type: 'numeric',
       min: 0,
@@ -1169,7 +1417,7 @@ async function generatePDF() {
     doc.text("3. Gráficos Operacionais e Topologia", 20, 23);
     
     const diagramEl = document.querySelector("#diagram-container .flow-diagram");
-    const unifilarEl = document.querySelector("#unifilar-container .unifilar");
+    const unifilarEl = document.querySelector("#unifilar-container .archify-unifilar-card") || document.querySelector("#unifilar-container .unifilar");
 
     if (diagramEl && unifilarEl && bessCharts.loadCurve && bessCharts.degradation) {
       const [capDiag, capLoad, capUni, capDeg] = await Promise.all([
@@ -1822,12 +2070,57 @@ function getExportCapture(sectionId) {
     return captureChartPng(bessCharts.loadCurve);
   }
   if (sectionId === 'linha-4-col1') {
-    return captureElementPng(document.querySelector('#unifilar-container .unifilar'), null);
+    const el = document.querySelector('#unifilar-container .archify-unifilar-card') || document.querySelector('#unifilar-container .unifilar');
+    return captureElementPng(el, null);
   }
   if (sectionId === 'linha-4-col2') {
     return captureChartPng(bessCharts.degradation);
   }
   return Promise.resolve(null);
+}
+
+// Exporta o diagrama unifilar como arquivo JPEG com fundo sólido
+function downloadUnifilarJpeg() {
+  const el = document.querySelector('#unifilar-container .archify-unifilar-card') || document.querySelector('#unifilar-container');
+  if (!el || typeof html2canvas === 'undefined') {
+    showToast("Calcule uma simulação antes de baixar");
+    return;
+  }
+  html2canvas(el, { backgroundColor: '#ffffff', scale: 2, logging: false }).then(canvas => {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'bess-diagrama-unifilar.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast("JPEG baixado com sucesso!");
+  }).catch(err => {
+    console.error("Erro ao exportar JPEG:", err);
+    showToast("Não foi possível baixar o JPEG");
+  });
+}
+
+// Exporta o diagrama unifilar diretamente em vetor SVG puro
+function downloadUnifilarSvg() {
+  const svgEl = document.querySelector('#unifilar-container svg');
+  if (!svgEl) {
+    showToast("Calcule uma simulação antes de baixar");
+    return;
+  }
+  const clone = svgEl.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const svgData = new XMLSerializer().serializeToString(clone);
+  const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bess-diagrama-unifilar.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("SVG baixado com sucesso!");
 }
 
 // Copia a seção como PNG para a área de transferência
@@ -1888,6 +2181,17 @@ function setupResultEvents() {
   setupExportButtons('linha-3-col2', 'btn-copy-linha-3-col2', 'btn-download-linha-3-col2', 'bess-curva-carga-24h.png');
   setupExportButtons('linha-4-col1', 'btn-copy-linha-4-col1', 'btn-download-linha-4-col1', 'bess-diagrama-unifilar.png');
   setupExportButtons('linha-4-col2', 'btn-copy-linha-4-col2', 'btn-download-linha-4-col2', 'bess-curva-degradacao.png');
+  
+  // Handlers adicionais da toolbar dedicada do Diagrama Unifilar Archify
+  const btnCopyUnifilar = document.getElementById('btn-copy-unifilar');
+  const btnPngUnifilar = document.getElementById('btn-download-unifilar-png');
+  const btnJpgUnifilar = document.getElementById('btn-download-unifilar-jpg');
+  const btnSvgUnifilar = document.getElementById('btn-download-unifilar-svg');
+
+  if (btnCopyUnifilar) btnCopyUnifilar.addEventListener('click', () => copySectionPng('linha-4-col1'));
+  if (btnPngUnifilar) btnPngUnifilar.addEventListener('click', () => downloadSectionPng('linha-4-col1', 'bess-diagrama-unifilar.png'));
+  if (btnJpgUnifilar) btnJpgUnifilar.addEventListener('click', downloadUnifilarJpeg);
+  if (btnSvgUnifilar) btnSvgUnifilar.addEventListener('click', downloadUnifilarSvg);
   
   const pdfBtn = document.getElementById('btn-pdf-report');
   if (pdfBtn) {

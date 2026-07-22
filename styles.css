@@ -20,11 +20,42 @@
   --color-canvas-text-soft: #f5f6f7;
   
   --color-hairline: #3d3a39;
-  
+
+  /* Semantic / status */
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fbbf24;
+  --color-info: #3b82f6;
+  --color-info-soft: #60a5fa;
+
+  /* Diagram line semantics */
+  --color-ac-line: #ef4444;
+  --color-dc-line: #3b82f6;
+  --color-comm-line: #8b949e;
+
+  /* Alpha tints (primary glow system) */
+  --tint-primary-06: rgba(0, 217, 146, 0.06);
+  --tint-primary-10: rgba(0, 217, 146, 0.1);
+  --tint-primary-20: rgba(0, 217, 146, 0.2);
+  --tint-warning-08: rgba(245, 158, 11, 0.08);
+  --tint-warning-35: rgba(245, 158, 11, 0.35);
+  --tint-error-15: rgba(239, 68, 68, 0.15);
+
+  /* Semantic aliases */
+  --surface-page: var(--color-canvas);
+  --surface-card: var(--color-canvas-soft);
+  --surface-raised: #1f1f1f;
+  --text-heading: var(--color-ink-strong);
+  --text-body: var(--color-ink);
+  --text-secondary: var(--color-body);
+  --text-muted: var(--color-mute);
+  --border-default: var(--color-hairline);
+  --border-focus: var(--color-primary);
+
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
-  
+
   /* Border Radius */
   --rounded-none: 0px;
   --rounded-xs: 4px;
@@ -32,7 +63,7 @@
   --rounded-md: 8px;
   --rounded-pill: 9999px;
   --rounded-full: 9999px;
-  
+
   /* Spacing */
   --spacing-xxs: 2px;
   --spacing-xs: 4px;
@@ -45,6 +76,24 @@
   --spacing-4xl: 40px;
   --spacing-5xl: 48px;
   --spacing-6xl: 64px;
+
+  /* Compact control heights */
+  --control-h-sm: 28px;
+  --control-h-md: 30px;
+  --control-h-lg: 38px;
+  --container-max: 1280px;
+
+  /* Effects */
+  --glow-primary-sm: 0 0 10px rgba(0, 217, 146, 0.15);
+  --glow-primary-card: 0 4px 15px rgba(0, 217, 146, 0.03);
+  --glow-primary-btn: 0 3px 10px rgba(0, 217, 146, 0.15);
+  --glow-primary-btn-hover: 0 4px 15px rgba(0, 217, 146, 0.3);
+  --glow-info: 0 4px 14px rgba(59, 130, 246, 0.12);
+  --shadow-tooltip: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --text-glow-primary: 0 0 10px rgba(0, 217, 146, 0.2);
+  --transition-fast: 0.2s ease-in-out;
+  --transition-action: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-slide: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Reset de Estilo */
@@ -96,7 +145,7 @@ body {
 
 .btn-secondary:hover {
   border-color: var(--color-primary);
-  box-shadow: 0 0 10px rgba(0, 217, 146, 0.15);
+  box-shadow: var(--glow-primary-sm);
 }
 
 /* Primitivas de Inputs */
@@ -132,7 +181,7 @@ body {
 
 /* Calculadora BESS */
 .container {
-  max-width: 1280px;
+  max-width: var(--container-max);
   margin: 0 auto;
   padding: var(--spacing-md) var(--spacing-lg);
   display: flex;
@@ -174,7 +223,7 @@ body {
 
 .simulations-select {
   min-width: 220px;
-  height: 28px;
+  height: var(--control-h-sm);
   padding: 0 var(--spacing-sm);
   font-size: 12px;
   background-color: var(--color-canvas-soft);
@@ -203,7 +252,7 @@ body {
 
 .calc-group:hover {
   border-color: var(--color-primary);
-  box-shadow: 0 4px 15px rgba(0, 217, 146, 0.03);
+  box-shadow: var(--glow-primary-card);
 }
 
 .calc-group-header h3 {
@@ -237,7 +286,7 @@ body {
 
 .calc-field select.input-text,
 .calc-field input.input-text {
-  height: 30px;
+  height: var(--control-h-md);
   padding: 0 var(--spacing-sm);
   background-color: var(--color-canvas);
   border: 1px solid var(--color-hairline);
@@ -253,12 +302,12 @@ body {
 
 /* Validation states - Compact */
 .calc-field .input-text.input-error {
-  border-color: #ef4444 !important;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+  border-color: var(--color-error) !important;
+  box-shadow: 0 0 0 2px var(--tint-error-15);
 }
 
 .calc-field .error-message {
-  color: #ef4444;
+  color: var(--color-error);
   font-size: 12px;
   margin-top: 1px;
   min-height: 14px;
@@ -289,15 +338,15 @@ body {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  height: 38px;
-  box-shadow: 0 3px 10px rgba(0, 217, 146, 0.15);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  height: var(--control-h-lg);
+  box-shadow: var(--glow-primary-btn);
+  transition: all var(--transition-action);
   position: relative;
   overflow: hidden;
 }
 
 .btn-calcular:hover:not(:disabled) {
-  box-shadow: 0 4px 15px rgba(0, 217, 146, 0.3);
+  box-shadow: var(--glow-primary-btn-hover);
   transform: translateY(-1px);
 }
 
@@ -504,10 +553,10 @@ body {
   font-size: 16px;
   font-weight: 700;
   color: var(--color-primary);
-  background-color: rgba(0, 217, 146, 0.1);
+  background-color: var(--tint-primary-10);
   padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--rounded-sm);
-  border: 1px solid rgba(0, 217, 146, 0.2);
+  border: 1px solid var(--tint-primary-20);
 }
 
 
@@ -555,8 +604,8 @@ body {
 
 .economic-list .value.highlight {
   color: var(--color-primary);
-  font-size: 18px;
-  text-shadow: 0 0 10px rgba(0, 217, 146, 0.2);
+  font-size: var(--text-value-highlight);
+  text-shadow: var(--text-glow-primary);
 }
 
 .grid-two-cols {
@@ -589,12 +638,6 @@ body {
 
 
 /* Calculadora BESS - Sprint 3 Chart Styles */
-
-:root {
-  --color-ac-line: #ef4444;
-  --color-dc-line: #3b82f6;
-  --color-comm-line: #8b949e;
-}
 
 .chart-placeholder {
   display: flex;
@@ -634,7 +677,7 @@ body {
 }
 
 .pdf-report__btn:hover:not(:disabled) {
-  background-color: rgba(0, 217, 146, 0.1);
+  background-color: var(--tint-primary-10);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
@@ -680,8 +723,8 @@ body {
   font-family: var(--font-mono);
   font-size: 12.5px;
   color: var(--color-primary);
-  background-color: rgba(0, 217, 146, 0.06);
-  border: 1px solid rgba(0, 217, 146, 0.2);
+  background-color: var(--tint-primary-06);
+  border: 1px solid var(--tint-primary-20);
   border-radius: var(--rounded-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   text-align: center;
@@ -699,7 +742,7 @@ body {
 
 .metric-hero {
   font-family: var(--font-sans);
-  font-size: 1.75rem;
+  font-size: var(--text-metric-hero);
   font-weight: 700;
   color: var(--color-ink-strong);
   text-align: center;
@@ -710,10 +753,10 @@ body {
   display: flex;
   align-items: flex-start;
   gap: var(--spacing-sm);
-  background-color: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  border-left: 3px solid #f59e0b;
-  color: #fbbf24;
+  background-color: var(--tint-warning-08);
+  border: 1px solid var(--tint-warning-35);
+  border-left: 3px solid var(--color-warning);
+  color: var(--color-warning-soft);
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--rounded-sm);
   font-size: 12px;
@@ -773,7 +816,7 @@ body {
 
 .node-card--accent {
   border-color: var(--color-mute);
-  background-color: #1f1f1f;
+  background-color: var(--surface-raised);
 }
 
 .node-card--bess {
@@ -781,8 +824,8 @@ body {
 }
 
 .node-card--bess:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.12);
+  border-color: var(--color-info);
+  box-shadow: var(--glow-info);
 }
 
 .node-card--comm {
@@ -800,16 +843,65 @@ body {
   padding: var(--spacing-sm);
 }
 
-.flow-diagram__top {
-  display: flex;
-  justify-content: center;
+/* Layout hub: Rede (topo) -> QGBT/ATS (centro) -> Cargas (direita) / BESS (baixo) */
+.func-diagram {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
+  grid-template-rows: auto auto auto auto auto;
+  grid-template-areas:
+    "rede   .   ."
+    "v1     .   ."
+    "qgbt   h   cargas"
+    "v2     .   ."
+    "bess   .   .";
+  justify-items: center;
+  align-items: center;
+  row-gap: var(--spacing-xs);
+  column-gap: var(--spacing-md);
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--spacing-sm) 0;
 }
 
-.flow-vertical {
+.func-link {
   display: flex;
-  justify-content: center;
   align-items: center;
   gap: var(--spacing-md);
+}
+
+.func-node--rede { grid-area: rede; }
+.func-node--qgbt { grid-area: qgbt; }
+.func-node--cargas { grid-area: cargas; }
+.func-node--bess { grid-area: bess; }
+.func-link--v1 { grid-area: v1; }
+.func-link--h {
+  grid-area: h;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 120px;
+}
+.func-link--v2 { grid-area: v2; }
+
+.func-link__dual {
+  display: flex;
+  gap: var(--spacing-lg);
+}
+
+.func-link__channel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 96px;
+}
+
+@media (max-width: 767px) {
+  .func-diagram {
+    grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+  }
 }
 
 .flow-vertical__line {
@@ -831,42 +923,40 @@ body {
   border-top: 8px solid var(--color-primary);
 }
 
+.flow-vertical__line--sm { height: 40px; }
+
+.flow-vertical__line--blue {
+  background-color: var(--color-info);
+}
+.flow-vertical__line--blue::after {
+  border-top-color: var(--color-info);
+}
+
+.flow-vertical__line--amber {
+  background-color: var(--color-warning);
+}
+.flow-vertical__line--amber::after {
+  border-top-color: var(--color-warning);
+}
+
+.flow-vertical__line--up::after {
+  content: none;
+}
+.flow-vertical__line--up::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 8px solid var(--color-warning);
+}
+
 .flow-vertical__info {
   display: flex;
   flex-direction: column;
   gap: 1px;
-}
-
-.flow-diagram__middle {
-  display: grid;
-  grid-template-columns: auto 1fr auto 1fr auto;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.flow-connector {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 0 var(--spacing-xs);
-  min-width: 130px;
-}
-
-.flow-connector .flow-value {
-  white-space: nowrap;
-}
-
-.flow-connector--dual {
-  gap: var(--spacing-md);
-}
-
-.flow-channel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  width: 100%;
 }
 
 .flow-line {
@@ -877,8 +967,8 @@ body {
   margin: 3px 0;
 }
 
-.flow-line--amber { background-color: #f59e0b; }
-.flow-line--blue { background-color: #3b82f6; }
+.flow-line--amber { background-color: var(--color-warning); }
+.flow-line--blue { background-color: var(--color-info); }
 
 .flow-line--right::after {
   content: '';
@@ -903,10 +993,10 @@ body {
 }
 
 .flow-line--amber.flow-line--left,
-.flow-line--amber.flow-line--right { color: #f59e0b; }
+.flow-line--amber.flow-line--right { color: var(--color-warning); }
 
 .flow-line--blue.flow-line--left,
-.flow-line--blue.flow-line--right { color: #3b82f6; }
+.flow-line--blue.flow-line--right { color: var(--color-info); }
 
 .flow-label {
   font-size: 11px;
@@ -939,8 +1029,8 @@ body {
 }
 
 .flow-text--green { color: var(--color-primary); }
-.flow-text--amber { color: #f59e0b; }
-.flow-text--blue { color: #60a5fa; }
+.flow-text--amber { color: var(--color-warning); }
+.flow-text--blue { color: var(--color-info-soft); }
 
 .flow-diagram__caption {
   margin-top: var(--spacing-sm);
@@ -950,7 +1040,99 @@ body {
   color: var(--color-mute);
 }
 
-/* --- Diagrama Unifilar --- */
+/* --- Diagrama Unifilar (Archify System) --- */
+.archify-unifilar-card {
+  width: 100%;
+  background: var(--color-canvas-subtle);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  overflow: hidden;
+}
+
+.archify-unifilar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px dashed var(--color-hairline);
+  margin-bottom: 4px;
+}
+
+.archify-unifilar-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.archify-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  box-shadow: 0 0 8px var(--color-primary);
+}
+
+.archify-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 217, 146, 0.12);
+  color: var(--color-primary);
+  border: 1px solid rgba(0, 217, 146, 0.25);
+}
+
+.archify-svg-viewport {
+  width: 100%;
+  background: linear-gradient(135deg, #f0f7fc 0%, #ffffff 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(0, 114, 255, 0.1);
+  padding: 8px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.archify-unifilar-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 600px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.badge--tech {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 114, 255, 0.1);
+  color: #0072ff;
+  border: 1px solid rgba(0, 114, 255, 0.25);
+  text-transform: uppercase;
+}
+
+.export-bar .btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .unifilar {
   display: flex;
   flex-direction: column;
@@ -981,13 +1163,12 @@ body {
   width: 2px;
 }
 
-.uni-branch {
+.uni-bus {
   width: min(400px, 85%);
-  height: 22px;
-  border-top: 3px solid var(--color-ac-line);
-  border-left: 3px solid var(--color-ac-line);
-  border-right: 3px solid var(--color-ac-line);
-  border-radius: var(--rounded-xs) var(--rounded-xs) 0 0;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--color-ac-line);
+  margin: 2px 0;
 }
 
 .uni-row {
@@ -1050,6 +1231,16 @@ body {
   width: 100%;
 }
 
+.uni-legend--top {
+  justify-content: flex-end;
+  margin-top: 0;
+  margin-bottom: var(--spacing-sm);
+  padding-top: 0;
+  padding-bottom: var(--spacing-sm);
+  border-top: none;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
 .uni-legend__item {
   display: inline-flex;
   align-items: center;
@@ -1084,7 +1275,7 @@ body {
 .chart-container .apexcharts-tooltip {
   background: var(--color-canvas-soft) !important;
   border: 1px solid var(--color-hairline) !important;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: var(--shadow-tooltip) !important;
 }
 
 .chart-container .apexcharts-legend-text {
