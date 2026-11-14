@@ -1,34 +1,41 @@
-# Allan Workbench - Calculadora BESS
+# Calculadora BESS
 
-Ferramenta de cálculo e dimensionamento de Battery Energy Storage Systems (BESS) do ecossistema **Allan Workbench**.
+Ferramenta estática do **Allan Workbench**: estudo de pré-dimensionamento de um sistema de armazenamento
+de energia em baterias. Neutra quanto a marca e modelo; o nome do equipamento é um campo opcional.
 
----
+## Etapas do estudo
 
-## Como Rodar Localmente
+| Etapa | O que responde |
+|---|---|
+| Premissas | Estratégia (deslocar a ponta, cortar o pico, substituir diesel), tarifas e equipamento |
+| Dimensionamento | Quantas unidades, limitadas por energia ou por potência, com memória de cálculo |
+| Operação diária | O que a rede enxerga em um dia típico e se a recarga cabe na demanda contratada |
+| Eficiência | Cadeia de perdas da bateria ao ponto de conexão |
+| Vida útil | Capacidade ano a ano, fim de vida e quando a entrega cai abaixo do exigido |
+| Reposição de capacidade | Comprar a mais no início ou acrescentar unidades ao longo dos anos |
+| Diesel × BESS | Custo e emissão do gerador contra o BESS |
+| Retorno financeiro | Retorno simples e descontado, valor presente líquido, taxa interna e custo nivelado |
+| Diagrama de implantação | Unifilar simplificado gerado a partir da planta, em quatro topologias |
 
-Para testar localmente, execute um servidor HTTP local simples:
+Relatório em PDF pela impressão do navegador. Estudos salvos por usuário em `bes_simulations`.
 
-### Opção 1: Live Server (Extension do VS Code)
-Abra a pasta no VS Code, clique com o botão direito no arquivo `index.html` e selecione **Open with Live Server**.
+## Estrutura
 
-### Opção 2: Python HTTP Server
-Abra o terminal na pasta da ferramenta e execute:
-```bash
-python -m http.server 5500
 ```
-Em seguida, acesse `http://localhost:5500`.
-Ou, `http://localhost:5500/index.html`.
-
-### Opção 3: Node.js (npx serve)
-Execute:
-```bash
-npx serve -l 5500
+index.html      interface
+styles.css      tokens do Workbench + estilos locais (inclui o estilo de impressão)
+engine.js       motor puro: BE.run(premissas) devolve tudo o que a tela mostra
+diagram.js      gerador puro de diagramas: BD.draw(planta) devolve SVG
+app.js          interface: campos, gráficos em SVG, tabelas, exportação, estudos salvos
+tests/          node tests/engine.test.js e node tests/diagram.test.js
 ```
 
----
+Sem bibliotecas de terceiros além do SDK do Supabase.
 
-## Registro da Ferramenta
+## Rodar localmente
 
-Para registrar esta ferramenta no ecossistema e habilitar acessos:
-1. Execute o script `sql/setup.sql` no painel SQL Editor do Supabase.
-2. Certifique-se de vincular os IDs dos usuários de teste à aplicação criada.
+```bash
+python -m http.server 8000
+```
+
+Abra `http://localhost:8000/?dev`. O `?dev` só funciona em localhost e pula o login do portal.

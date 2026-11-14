@@ -5,494 +5,297 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Calculadora BESS - Allan Workbench</title>
   <link rel="stylesheet" href="styles.css">
-  
-  <!-- Fontes Oficiais -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono&display=swap" rel="stylesheet">
-  
-  <!-- Supabase JS Client SDK -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- ApexCharts para gráficos interativos (curvas de carga e degradação) -->
-  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-
-  <!-- html2canvas para captura de blocos HTML como PNG (Copiar / Baixar / PDF) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-  <!-- jsPDF (core) + autotable (plugin) para o relatório PDF -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js" defer></script>
 </head>
-<body>
+<body style="display: none;">
 
-  <!-- loading-overlay para mitigar tela branca em caso de falha de carregamento do JS -->
-  <div id="loading-overlay" style="position: fixed; inset: 0; background-color: var(--color-canvas, #101010); display: flex; align-items: center; justify-content: center; z-index: 99999; color: var(--color-ink, #f2f2f2); font-family: var(--font-sans, sans-serif); font-size: 16px; transition: opacity 0.2s ease-in-out;">
-    <div style="text-align: center;">
-      <div style="width: 24px; height: 24px; border: 2px solid var(--color-mute, #8b949e); border-top-color: var(--color-primary, #00d992); border-radius: 50%; animation: spin-loading 1s linear infinite; margin: 0 auto 12px auto;"></div>
-      <span>Carregando...</span>
+<main class="wrap">
+  <header class="top">
+    <div>
+      <h1>Calculadora BESS</h1>
+      <p class="lead">Estudo de um sistema de armazenamento: dimensionamento, operação, eficiência, vida útil, retorno e diagrama de implantação. Os números se atualizam enquanto você edita.</p>
+    </div>
+    <div class="bar no-print">
+      <label id="sim-wrap" hidden>Estudo salvo <select id="sim" class="inp"></select></label>
+      <button class="btn btn-secondary" id="sim-save" type="button" hidden>Salvar</button>
+      <button class="btn btn-secondary" id="sim-del" type="button" hidden>Excluir</button>
+      <button class="btn btn-secondary" id="reset" type="button">Recomeçar</button>
+      <button class="btn btn-primary" id="print" type="button">Relatório em PDF</button>
+    </div>
+  </header>
+
+  <div id="kpis" class="kpis" aria-live="polite"></div>
+  <div id="warns" role="status"></div>
+
+  <div class="layout">
+    <nav class="nav no-print" aria-label="Etapas do estudo">
+      <a href="#s-premissas">1. Premissas</a>
+      <a href="#s-dim">2. Dimensionamento</a>
+      <a href="#s-op">3. Operação diária</a>
+      <a href="#s-rte">4. Eficiência</a>
+      <a href="#s-vida">5. Vida útil</a>
+      <a href="#s-aug">6. Reposição de capacidade</a>
+      <a href="#s-diesel" data-est="diesel">7. Diesel × BESS</a>
+      <a href="#s-fin">8. Retorno financeiro</a>
+      <a href="#s-diag">9. Diagrama de implantação</a>
+    </nav>
+
+    <div class="content">
+      <section id="s-premissas">
+        <h2><span>1</span> Premissas</h2>
+        <div class="cols3">
+          <fieldset>
+            <legend>Projeto</legend>
+            <label>Nome do estudo<input class="inp" data-k="nome" maxlength="120" placeholder="opcional"></label>
+            <label>Aplicação<input class="inp" data-k="aplicacao" maxlength="120" placeholder="ex.: indústria de papel"></label>
+            <label>Concessionária<input class="inp" data-k="concessionaria" maxlength="120" placeholder="opcional"></label>
+            <div class="f2">
+              <label>Subgrupo<select class="inp" data-k="grupo"><option>A4</option><option>A3a</option><option>A3</option><option>AS</option></select></label>
+              <label>Modalidade<select class="inp" data-k="modalidade"><option value="verde">Verde</option><option value="azul">Azul</option></select></label>
+            </div>
+            <label>Demanda contratada (kW)<input class="inp" type="number" min="0" step="1" data-k="demandaContratada"></label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Estratégia</legend>
+            <div id="est" class="seg" role="group" aria-label="Estratégia do BESS">
+              <button type="button" data-v="shift">Deslocar a ponta</button>
+              <button type="button" data-v="peak">Cortar o pico</button>
+              <button type="button" data-v="diesel">Substituir diesel</button>
+            </div>
+            <p class="hint" id="est-hint"></p>
+            <div data-est="shift" class="stack">
+              <label>Energia a deslocar no período (kWh)<input class="inp" type="number" min="0" step="1" data-k="energiaPeriodo"></label>
+              <div class="f2">
+                <label>Dias de operação no período<input class="inp" type="number" min="1" max="31" step="1" data-k="dias"></label>
+                <label>Ciclos por dia<input class="inp" type="number" min="0.1" max="4" step="0.1" data-k="ciclosDia"></label>
+              </div>
+            </div>
+            <div data-est="peak" class="stack">
+              <div class="f2">
+                <label>Pico medido (kW)<input class="inp" type="number" min="0" step="1" data-k="picoMedido"></label>
+                <label>Limite desejado (kW)<input class="inp" type="number" min="0" step="1" data-k="limite"></label>
+                <label>Duração do pico (h)<input class="inp" type="number" min="0.25" step="0.25" data-k="duracaoPico"></label>
+                <label title="Fração da área do retângulo potência × duração que o pico realmente ocupa">Fator de forma<input class="inp" type="number" min="0.1" max="1" step="0.05" data-k="fatorForma"></label>
+              </div>
+              <label>Dias com pico por mês<input class="inp" type="number" min="1" max="31" step="1" data-k="eventosMes"></label>
+            </div>
+            <div data-est="diesel" class="stack">
+              <div class="f2">
+                <label>Potência atendida pelo gerador (kW)<input class="inp" type="number" min="0" step="1" data-k="potGerador"></label>
+                <label>Horas por dia<input class="inp" type="number" min="0.5" step="0.5" data-k="horasGerador"></label>
+              </div>
+              <label>Dias de uso por mês<input class="inp" type="number" min="1" max="31" step="1" data-k="diasGerador"></label>
+            </div>
+            <div class="f2">
+              <label>Início da ponta (h)<input class="inp" type="number" min="0" max="23" step="1" data-k="pontaIni"></label>
+              <label>Duração da ponta (h)<input class="inp" type="number" min="1" max="8" step="1" data-k="pontaDur"></label>
+              <label>Início da recarga (h)<input class="inp" type="number" min="0" max="23" step="1" data-k="recargaIni"></label>
+              <label>Duração da recarga (h)<input class="inp" type="number" min="1" max="12" step="1" data-k="recargaDur"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Tarifas e equipamento</legend>
+            <div class="f2">
+              <label title="Energia e uso do sistema, com impostos">Energia na ponta (R$/kWh)<input class="inp" type="number" min="0" step="0.01" data-k="tPonta"></label>
+              <label title="Energia e uso do sistema, com impostos">Fora de ponta (R$/kWh)<input class="inp" type="number" min="0" step="0.01" data-k="tFora"></label>
+              <label data-mod="verde">Demanda (R$/kW)<input class="inp" type="number" min="0" step="0.5" data-k="tDemanda"></label>
+              <label data-mod="azul">Demanda na ponta (R$/kW)<input class="inp" type="number" min="0" step="0.5" data-k="tDemandaPonta"></label>
+            </div>
+            <label>Modelo do equipamento<input class="inp" data-k="modelo" maxlength="120" placeholder="opcional; aparece no relatório"></label>
+            <div class="f2">
+              <label>Energia por unidade (kWh)<input class="inp" type="number" min="1" step="1" data-k="eUnit"></label>
+              <label>Potência por unidade (kW)<input class="inp" type="number" min="1" step="1" data-k="pUnit"></label>
+              <label title="Profundidade de descarga usada na operação">Profundidade de descarga (%)<input class="inp" type="number" min="10" max="100" step="1" data-k="dod"></label>
+              <label title="Unidade a mais só quando faltar mais que isto">Déficit aceito (%)<input class="inp" type="number" min="0" max="30" step="0.5" data-k="tolerancia"></label>
+            </div>
+          </fieldset>
+        </div>
+      </section>
+
+      <section id="s-dim">
+        <h2><span>2</span> Dimensionamento</h2>
+        <div class="cols2">
+          <div>
+            <h3>Memória de cálculo</h3>
+            <table class="tbl" id="memoria"></table>
+            <p class="hint">O dimensionamento é feito por ciclo, no ponto de conexão. A unidade a mais só entra quando o déficit passa do valor aceito nas premissas.</p>
+          </div>
+          <div>
+            <h3>Opções de arredondamento</h3>
+            <table class="tbl" id="opcoes"></table>
+            <h3>Energia em um ciclo</h3>
+            <div id="ciclo" class="bars"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="s-op">
+        <h2><span>3</span> Operação diária</h2>
+        <p class="hint">Dia típico com um perfil de carga industrial ilustrativo, ajustado à demanda contratada. Serve para conferir se a recarga cabe na demanda e o que a rede enxerga.</p>
+        <div id="ch-dia" class="chart"></div>
+        <div id="dia-facts" class="facts"></div>
+      </section>
+
+      <section id="s-rte">
+        <h2><span>4</span> Eficiência de ida e volta</h2>
+        <div class="cols2">
+          <div>
+            <p class="hint">Do que entra da rede na recarga ao que chega à carga na descarga. Cada etapa tira a sua parte; o total é o rendimento no ponto de conexão.</p>
+            <div class="f2">
+              <label title="Rendimento de ida e volta das células, em corrente contínua">Bateria, ida e volta (%)<input class="inp" type="number" min="50" max="100" step="0.1" data-k="rteBat"></label>
+              <label title="Rendimento do conversor em um sentido">Conversor, um sentido (%)<input class="inp" type="number" min="80" max="100" step="0.1" data-k="pcs"></label>
+              <label>Transformador, um sentido (%)<input class="inp" type="number" min="90" max="100" step="0.1" data-k="trafo"></label>
+              <label title="Quantos transformadores a energia atravessa entre o BESS e o ponto de conexão">Transformadores no caminho<input class="inp" type="number" min="0" max="4" step="1" data-k="nTrafos"></label>
+              <label>Cabos e conexões, um sentido (%)<input class="inp" type="number" min="90" max="100" step="0.1" data-k="cabos"></label>
+              <label title="Climatização, controle e proteção, como fração da energia entregue">Consumo auxiliar (%)<input class="inp" type="number" min="0" max="20" step="0.1" data-k="aux"></label>
+            </div>
+          </div>
+          <div>
+            <h3>Onde a energia se perde</h3>
+            <div id="rte" class="bars"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="s-vida">
+        <h2><span>5</span> Vida útil e retenção de capacidade</h2>
+        <div class="cols2">
+          <div>
+            <div class="f2">
+              <label>Horizonte do estudo (anos)<input class="inp" type="number" min="1" max="30" step="1" data-k="horizonte"></label>
+              <label title="Parte do desgaste que acontece mesmo sem uso">Desgaste por calendário (%)<input class="inp" type="number" min="0" max="100" step="5" data-k="parcelaCalendario"></label>
+              <label>Fim de vida, estado de saúde (%)<input class="inp" type="number" min="40" max="95" step="1" data-k="eol"></label>
+              <label>Ciclos garantidos<input class="inp" type="number" min="0" step="100" data-k="ciclosGarantidos"></label>
+              <label title="0 dimensiona para o início de vida; um ano maior já compra com folga para chegar até lá">Dimensionar para o ano<input class="inp" type="number" min="0" max="30" step="1" data-k="anoProjeto"></label>
+            </div>
+            <div id="vida-facts" class="facts"></div>
+            <p class="hint">A curva de desgaste vem de uma tabela de fabricante para 1 ciclo por dia; a parcela de ciclos é ajustada ao número de ciclos por ano deste estudo. Use a curva do seu fornecedor para garantias.</p>
+          </div>
+          <div>
+            <div id="ch-vida" class="chart"></div>
+          </div>
+        </div>
+        <details>
+          <summary>Tabela ano a ano</summary>
+          <div class="tbl-wrap"><table class="tbl num" id="vida-tbl"></table></div>
+        </details>
+      </section>
+
+      <section id="s-aug">
+        <h2><span>6</span> Reposição de capacidade</h2>
+        <p class="hint">Duas formas de manter a entrega até o fim do horizonte: comprar a mais no início, ou começar com o necessário e acrescentar unidades quando a capacidade cair.</p>
+        <div class="cols2">
+          <div>
+            <div id="plano" class="seg" role="group" aria-label="Plano de capacidade">
+              <button type="button" data-v="aug">Acrescentar ao longo dos anos</button>
+              <button type="button" data-v="bol">Comprar a mais no início</button>
+            </div>
+            <label class="narrow" title="Queda anual esperada no preço do kWh instalado; barateia as unidades compradas mais tarde">Queda de preço por ano (%)<input class="inp" type="number" min="0" max="20" step="0.5" data-k="quedaPreco"></label>
+            <table class="tbl" id="aug-cmp"></table>
+            <div id="aug-sched"></div>
+          </div>
+          <div><div id="ch-aug" class="chart"></div></div>
+        </div>
+      </section>
+
+      <section id="s-diesel" data-est="diesel">
+        <h2><span>7</span> Diesel × BESS</h2>
+        <div class="cols2">
+          <div>
+            <div class="f2">
+              <label>Consumo específico (L/kWh)<input class="inp" type="number" min="0" step="0.01" data-k="consumoEspecifico"></label>
+              <label>Preço do diesel (R$/L)<input class="inp" type="number" min="0" step="0.05" data-k="precoDiesel"></label>
+              <label title="Manutenção e operação do gerador">Manutenção do gerador (R$/kWh)<input class="inp" type="number" min="0" step="0.01" data-k="omGerador"></label>
+              <label>Emissão do diesel (kg CO₂/L)<input class="inp" type="number" min="0" step="0.01" data-k="emissaoDiesel"></label>
+              <label>Emissão da rede (kg CO₂/kWh)<input class="inp" type="number" min="0" step="0.005" data-k="emissaoRede"></label>
+            </div>
+            <table class="tbl" id="diesel-tbl"></table>
+          </div>
+          <div>
+            <h3>Custo por ano para a mesma energia</h3>
+            <div id="diesel-bars" class="bars"></div>
+            <h3>Emissão por ano</h3>
+            <div id="diesel-co2" class="bars"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="s-fin">
+        <h2><span>8</span> Retorno financeiro</h2>
+        <div class="cols2">
+          <div>
+            <div class="f2">
+              <label>Investimento por kWh instalado (R$)<input class="inp" type="number" min="0" step="50" data-k="capexKwh"></label>
+              <label title="Projeto, obra civil, integração e comissionamento">Custo fixo de implantação (R$)<input class="inp" type="number" min="0" step="1000" data-k="capexFixo"></label>
+              <label title="Operação e manutenção por ano, sobre o investido">Operação e manutenção (% ao ano)<input class="inp" type="number" min="0" max="20" step="0.1" data-k="opexPct"></label>
+              <label>Taxa de desconto (% ao ano)<input class="inp" type="number" min="0" max="50" step="0.5" data-k="taxa"></label>
+              <label>Reajuste de tarifas e custos (% ao ano)<input class="inp" type="number" min="0" max="30" step="0.5" data-k="reajuste"></label>
+            </div>
+            <table class="tbl" id="fin-tbl"></table>
+            <p class="hint">Os custos de investimento que vêm preenchidos são ilustrativos. Troque pelos da sua cotação antes de usar o resultado.</p>
+          </div>
+          <div><div id="ch-fin" class="chart"></div></div>
+        </div>
+        <details>
+          <summary>Fluxo de caixa ano a ano</summary>
+          <div class="tbl-wrap"><table class="tbl num" id="fin-flow"></table></div>
+        </details>
+      </section>
+
+      <section id="s-diag">
+        <h2><span>9</span> Diagrama de implantação</h2>
+        <div class="cols2 wide-right">
+          <div>
+            <fieldset>
+              <legend>Planta</legend>
+              <label title="Potência de cada transformador de distribuição, em kVA, separadas por vírgula">Transformadores (kVA)<input class="inp" id="pl-trafos" placeholder="300, 300, 1000"></label>
+              <label class="chk"><input type="checkbox" id="pl-ger"> Tem gerador com chave de transferência</label>
+              <label id="pl-kva-wrap">Transformador do gerador (kVA)<input class="inp" type="number" min="1" step="1" id="pl-kva"></label>
+            </fieldset>
+            <h3>Onde conectar o BESS</h3>
+            <div id="topo" class="seg col" role="group" aria-label="Topologia de conexão">
+              <button type="button" data-v="bt">Distribuído em baixa tensão</button>
+              <button type="button" data-v="mt">Centralizado em média tensão</button>
+              <button type="button" data-v="serie">Em série, transferência em baixa tensão</button>
+              <button type="button" data-v="atual">Situação atual, sem BESS</button>
+            </div>
+            <p id="diag-desc" class="hint"></p>
+            <ul id="diag-notes" class="notes"></ul>
+            <div class="bar no-print">
+              <button class="btn btn-primary" id="dg-png" type="button">Baixar PNG</button>
+              <button class="btn btn-secondary" id="dg-svg" type="button">Baixar SVG</button>
+              <button class="btn btn-secondary" id="dg-copy" type="button">Copiar imagem</button>
+            </div>
+          </div>
+          <div id="diagram" class="diagram"></div>
+        </div>
+      </section>
+
+      <p class="foot">Estudo de pré-dimensionamento. Não substitui projeto executivo, estudo de proteção nem a curva de garantia do fabricante.</p>
     </div>
   </div>
+</main>
 
-  <!-- Layout Container Base -->
-  <main class="container">
-    <header class="header">
-      <h1>Calculadora BESS</h1>
-      <div id="simulations-container" class="simulations-dropdown-container">
-        <span id="user-welcome" class="user-welcome" style="display: none;">Carregando...</span>
-        <!-- Dropdown de simulações (inicialmente oculto ou vazio) -->
-        <select id="simulations-select" class="input-text simulations-select" style="display: none;">
-          <option value="">Carregar simulação...</option>
-        </select>
-      </div>
-    </header>
+<div id="toast" class="toast" role="status" hidden></div>
 
-    <!-- O Grid de Parâmetros -->
-    <form id="bess-form" novalidate>
-      <div class="calc-grid">
-        <!-- COLUNA 1 -->
-        <div class="calc-group card" id="group-geral">
-          <div class="calc-group-header" tabindex="0" role="button" aria-expanded="true" aria-controls="group-geral-fields">
-            <h3>Parâmetros Gerais</h3>
-          </div>
-          <div class="calc-group-content" id="group-geral-fields">
-            <div class="calc-field">
-              <label for="geral-label">Nome da Simulação</label>
-              <input type="text" id="geral-label" class="input-text" value="Indústria de Papel - Caso Base">
-              <span class="error-message" id="geral-label-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="geral-estrategia">Estratégia do BESS</label>
-              <select id="geral-estrategia" class="input-text">
-                <option value="load-shifting" selected>Load-Shifting (Deslocamento de Carga)</option>
-                <option value="peak-shaving" disabled title="Em breve">Peak-Shaving (Em breve)</option>
-                <option value="diesel-reduction" disabled title="Em breve">Redução de Diesel (Em breve)</option>
-              </select>
-              <span class="error-message" id="geral-estrategia-error"></span>
-            </div>
-            
-            <div class="calc-field">
-              <label for="geral-aplicacao">Aplicação</label>
-              <input type="text" id="geral-aplicacao" class="input-text" value="Indústria de Papel">
-              <span class="error-message" id="geral-aplicacao-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="geral-regime">Regime de Contratação</label>
-              <select id="geral-regime" class="input-text">
-                <option value="ACR" selected>ACR (Ambiente Regulado)</option>
-                <option value="ACL" disabled title="Em breve">ACL (Ambiente Livre) (Em breve)</option>
-              </select>
-              <span class="error-message" id="geral-regime-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="geral-concessionaria">Concessionária</label>
-              <input type="text" id="geral-concessionaria" class="input-text" value="Enel-CE">
-              <span class="error-message" id="geral-concessionaria-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="geral-grupo-tarifario">Grupo Tarifário</label>
-              <select id="geral-grupo-tarifario" class="input-text">
-                <option value="A4" selected>A4 (2,3 kV a 25 kV)</option>
-                <option value="A3a">A3a (30 kV a 44 kV)</option>
-                <option value="A3">A3 (69 kV)</option>
-                <option value="AS">AS (Subterrâneo)</option>
-              </select>
-              <span class="error-message" id="geral-grupo-tarifario-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="geral-modalidade">Modalidade Tarifária</label>
-              <select id="geral-modalidade" class="input-text">
-                <option value="Verde" selected>Verde</option>
-                <option value="Azul" disabled title="Em breve">Azul (Em breve)</option>
-              </select>
-              <span class="error-message" id="geral-modalidade-error"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- COLUNA 2 -->
-        <div class="calc-group card" id="group-projeto">
-          <div class="calc-group-header" tabindex="0" role="button" aria-expanded="true" aria-controls="group-projeto-fields">
-            <h3>Parâmetros de Projeto</h3>
-          </div>
-          <div class="calc-group-content" id="group-projeto-fields">
-            <div class="calc-field">
-              <label for="projeto-consumo-kwh">Consumo (Energia Deslocamento) (kWh) *</label>
-              <input type="text" id="projeto-consumo-kwh" class="input-text" placeholder="Ex: 4620,0">
-              <span class="error-message" id="projeto-consumo-kwh-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="projeto-demanda-kw">Demanda Contratada (kW) *</label>
-              <input type="text" id="projeto-demanda-kw" class="input-text" placeholder="Ex: 470,0">
-              <span class="error-message" id="projeto-demanda-kw-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="projeto-dias-uteis">Dias Úteis *</label>
-              <input type="number" id="projeto-dias-uteis" class="input-text" placeholder="Ex: 22" min="1">
-              <span class="error-message" id="projeto-dias-uteis-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="projeto-ciclos-dia">Ciclos por Dia</label>
-              <input type="number" id="projeto-ciclos-dia" class="input-text" value="1" min="1">
-              <span class="error-message" id="projeto-ciclos-dia-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="projeto-hora-inicio-hp">Hora Início HP (Duração 3h)</label>
-              <input type="time" id="projeto-hora-inicio-hp" class="input-text" value="18:00">
-              <span class="error-message" id="projeto-hora-inicio-hp-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="projeto-tarifa-hp">Tarifa Ponta - HP (R$/kWh)</label>
-              <input type="text" id="projeto-tarifa-hp" class="input-text" value="2,02">
-              <span class="error-message" id="projeto-tarifa-hp-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="projeto-tarifa-fp">Tarifa Fora Ponta - FP (R$/kWh)</label>
-              <input type="text" id="projeto-tarifa-fp" class="input-text" value="0,42">
-              <span class="error-message" id="projeto-tarifa-fp-error"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- COLUNA 3 -->
-        <div class="calc-group card" id="group-equipamento">
-          <div class="calc-group-header" tabindex="0" role="button" aria-expanded="true" aria-controls="group-equipamento-fields">
-            <h3>Parâmetros do Equipamento</h3>
-          </div>
-          <div class="calc-group-content" id="group-equipamento-fields">
-            <div class="calc-field">
-              <label for="equipamento-rte">RTE - Eficiência (%)</label>
-              <input type="text" id="equipamento-rte" class="input-text" value="90,0">
-              <span class="error-message" id="equipamento-rte-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-dod">DoD - Profundidade Descarga (%)</label>
-              <input type="text" id="equipamento-dod" class="input-text" value="90,0">
-              <span class="error-message" id="equipamento-dod-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-eol">EOL - Fim de Vida SoH (%)</label>
-              <input type="text" id="equipamento-eol" class="input-text" value="70,0">
-              <span class="error-message" id="equipamento-eol-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-ciclos">Ciclos Garantidos</label>
-              <input type="number" id="equipamento-ciclos" class="input-text" value="8000">
-              <span class="error-message" id="equipamento-ciclos-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-energia-kwh">Energia BESS Unitária (kWh)</label>
-              <input type="text" id="equipamento-energia-kwh" class="input-text" value="261,0">
-              <span class="error-message" id="equipamento-energia-kwh-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-potencia-kw">Potência BESS Unitária (kW)</label>
-              <input type="text" id="equipamento-potencia-kw" class="input-text" value="125,0">
-              <span class="error-message" id="equipamento-potencia-kw-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-modelo">Modelo do Equipamento</label>
-              <input type="text" id="equipamento-modelo" class="input-text" value="BESS 261 kWh">
-              <span class="error-message" id="equipamento-modelo-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-protecao">Tipo de Proteção</label>
-              <select id="equipamento-protecao" class="input-text">
-                <option value="ATS" selected>Chave ATS</option>
-                <option value="QGBT">Barramento QGBT</option>
-              </select>
-              <span class="error-message" id="equipamento-protecao-error"></span>
-            </div>
-
-            <div class="calc-field">
-              <label for="equipamento-perdas">Perdas do Sistema (%)</label>
-              <input type="text" id="equipamento-perdas" class="input-text" value="2,0">
-              <span class="error-message" id="equipamento-perdas-error"></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Botão CALCULAR -->
-      <div class="action-bar">
-        <button type="submit" id="btn-calcular" class="btn btn-primary btn-calcular">
-          CALCULAR
-        </button>
-      </div>
-    </form>
-
-    <!-- LINHA 2: RACIONAL DO CÁLCULO -->
-    <section id="linha-2" class="result-section card" style="display: none;" aria-live="polite">
-      <div class="result-section-header">
-        <h2>Racional do Cálculo</h2>
-        <div class="btn-group export-bar">
-          <button type="button" class="btn btn-icon" id="btn-copy-linha-2" title="Copiar como PNG" aria-label="Copiar racional do cálculo como PNG">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-              <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-              <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
-            </svg>
-          </button>
-          <button type="button" class="btn btn-icon" id="btn-download-linha-2" title="Baixar como PNG" aria-label="Baixar racional do cálculo como PNG">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      
-      <div class="rationale-grid" id="rationale-capture">
-        <!-- Bloco 1: Dimensionamento -->
-        <div class="rationale-block result-card" id="block-dimensionamento">
-          <h4>Dimensionamento</h4>
-          <code class="formula-badge">E_nom = E_ciclo / (DoD * RTE * η_sys)</code>
-          <div class="formula-substitution" id="sub-nom"></div>
-          <div class="metric-hero" id="result-nom"></div>
-          <div class="bess-qty-container">
-            <span class="bess-qty-value" id="bess-qty"></span>
-          </div>
-          <div class="alert-banner" id="warning-subdimensionado" style="display: none;">
-            <span class="alert-banner__icon" aria-hidden="true">⚠️</span>
-            <span>Sistema subdimensionado. A capacidade instalada é inferior à necessária e a degradação comprometerá o desempenho antes do EOL previsto.</span>
-          </div>
-        </div>
-        
-        <!-- Bloco 2: Energia por Ciclo -->
-        <div class="rationale-block result-card" id="block-energia">
-          <h4>Energia por Ciclo</h4>
-          <ul class="energy-flow-list">
-            <li>
-              <span class="label">Energia de Carga (E<sub>carga</sub>)</span>
-              <span class="value" id="val-carga"></span>
-              <span class="subtext" id="sub-val-carga"></span>
-            </li>
-            <li>
-              <span class="label">Energia de Descarga (E<sub>descarga</sub>)</span>
-              <span class="value" id="val-descarga"></span>
-              <span class="subtext" id="sub-val-descarga"></span>
-            </li>
-            <li>
-              <span class="label">Energia Compensada (E<sub>compensada</sub>)</span>
-              <span class="value" id="val-compensada"></span>
-              <span class="subtext" id="sub-val-compensada"></span>
-            </li>
-            <li>
-              <span class="label">Energia Consumida (E<sub>consumida</sub>)</span>
-              <span class="value" id="val-consumida"></span>
-              <span class="subtext" id="sub-val-consumida"></span>
-            </li>
-          </ul>
-        </div>
-        
-        <!-- Bloco 3: Resumo Econômico -->
-        <div class="rationale-block result-card" id="block-economico">
-          <h4>Resumo Econômico (Ciclo)</h4>
-          <ul class="economic-list">
-            <li>
-              <span class="label">Custo Carga FP</span>
-              <span class="value" id="val-custo-fp"></span>
-            </li>
-            <li>
-              <span class="label">Custo Evitado HP</span>
-              <span class="value" id="val-custo-hp"></span>
-            </li>
-            <li class="savings-item">
-              <span class="label">Economia Líquida</span>
-              <span class="value highlight" id="val-economia"></span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- LINHA 3: DIAGRAMAS E CURVAS -->
-    <div class="grid-two-cols">
-      <!-- Coluna 1: Diagrama de Funcionamento BESS -->
-      <section id="linha-3-col1" class="result-section card" style="display: none;" aria-live="polite">
-        <div class="result-section-header">
-          <div class="title-with-badge">
-            <h2>Diagrama de Funcionamento BESS</h2>
-            <span class="badge badge--tech">Archify Flow System</span>
-          </div>
-          <div class="btn-group export-bar" id="flow-export-bar">
-            <button type="button" class="btn btn-icon btn-sm" id="btn-copy-flow" title="Copiar como PNG" aria-label="Copiar diagrama de funcionamento como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
-              </svg>
-              <span>Copiar</span>
-            </button>
-            <button type="button" class="btn btn-icon btn-sm" id="btn-download-flow-png" title="Baixar como PNG" aria-label="Baixar diagrama de funcionamento como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-              </svg>
-              <span>PNG</span>
-            </button>
-            <button type="button" class="btn btn-icon btn-sm" id="btn-download-flow-jpg" title="Baixar como JPEG" aria-label="Baixar diagrama de funcionamento como JPEG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
-                <path d="M14.002 13h-12a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zm-12-1h12V4h-12v8z"/>
-                <path d="M10.648 7.646a.5.5 0 0 1 .577-.093l2.277 1.366V12h-11v-1.5l2.777-2.777a.5.5 0 0 1 .707 0l2.646 2.646 2.023-2.723z"/>
-              </svg>
-              <span>JPG</span>
-            </button>
-            <button type="button" class="btn btn-icon btn-sm" id="btn-download-flow-svg" title="Baixar como SVG" aria-label="Baixar diagrama de funcionamento como SVG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
-                <path d="M4.5 12.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
-              </svg>
-              <span>SVG</span>
-            </button>
-          </div>
-        </div>
-        <div class="diagram-container" id="diagram-container">
-          <div class="chart-placeholder">Clique em CALCULAR para gerar o diagrama de funcionamento.</div>
-        </div>
-      </section>
-
-      <!-- Coluna 2: Curva de Carga 24h -->
-      <section id="linha-3-col2" class="result-section card" style="display: none;" role="region" aria-label="Curva de Carga 24h" aria-live="polite">
-        <div class="result-section-header">
-          <h2>Curva de Carga 24h</h2>
-          <div class="btn-group export-bar">
-            <button type="button" class="btn btn-icon" id="btn-copy-linha-3-col2" title="Copiar como PNG" aria-label="Copiar curva de carga 24h como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
-              </svg>
-            </button>
-            <button type="button" class="btn btn-icon" id="btn-download-linha-3-col2" title="Baixar como PNG" aria-label="Baixar curva de carga 24h como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="chart-container" id="load-curve-container">
-          <div class="chart-placeholder">Clique em CALCULAR para visualizar a curva de carga de 24h.</div>
-        </div>
-      </section>
-    </div>
-
-    <!-- LINHA 4: DIAGRAMA UNIFILAR E CURVA DE DEGRADAÇÃO -->
-    <div class="grid-two-cols" style="margin-top: var(--spacing-md);">
-      <!-- Coluna 1: Diagrama Unifilar -->
-      <section id="linha-4-col1" class="result-section card" style="display: none;" role="region" aria-label="Diagrama Unifilar" aria-live="polite">
-        <div class="result-section-header">
-          <div class="title-with-badge">
-            <h2>Diagrama Unifilar Elétrico</h2>
-            <span class="badge badge--tech">Livoltek Archify System</span>
-          </div>
-          <div class="btn-group export-bar" id="unifilar-export-bar">
-            <button type="button" class="btn btn-icon btn-sm" id="btn-copy-unifilar" title="Copiar como PNG" aria-label="Copiar diagrama unifilar como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
-              </svg>
-              <span>Copiar</span>
-            </button>
-            <button type="button" class="btn btn-icon btn-sm" id="btn-download-unifilar-png" title="Baixar como PNG" aria-label="Baixar diagrama unifilar como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-              </svg>
-              <span>PNG</span>
-            </button>
-            <button type="button" class="btn btn-icon btn-sm" id="btn-download-unifilar-jpg" title="Baixar como JPEG" aria-label="Baixar diagrama unifilar como JPEG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
-                <path d="M14.002 13h-12a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zm-12-1h12V4h-12v8z"/>
-                <path d="M10.648 7.646a.5.5 0 0 1 .577-.093l2.277 1.366V12h-11v-1.5l2.777-2.777a.5.5 0 0 1 .707 0l2.646 2.646 2.023-2.723z"/>
-              </svg>
-              <span>JPG</span>
-            </button>
-            <button type="button" class="btn btn-icon btn-sm" id="btn-download-unifilar-svg" title="Baixar como SVG" aria-label="Baixar diagrama unifilar como SVG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
-                <path d="M4.5 12.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
-              </svg>
-              <span>SVG</span>
-            </button>
-          </div>
-        </div>
-        <div class="diagram-container" id="unifilar-container">
-          <div class="chart-placeholder">Clique em CALCULAR para gerar o diagrama unifilar elétrico.</div>
-        </div>
-      </section>
-
-      <!-- Coluna 2: Curva de Degradação -->
-      <section id="linha-4-col2" class="result-section card" style="display: none;" role="region" aria-label="Curva de Degradação" aria-live="polite">
-        <div class="result-section-header">
-          <h2>Curva de Degradação</h2>
-          <div class="btn-group export-bar">
-            <button type="button" class="btn btn-icon" id="btn-copy-linha-4-col2" title="Copiar como PNG" aria-label="Copiar curva de degradação como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
-                <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
-              </svg>
-            </button>
-            <button type="button" class="btn btn-icon" id="btn-download-linha-4-col2" title="Baixar como PNG" aria-label="Baixar curva de degradação como PNG">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="chart-container" id="degradation-container">
-          <div class="chart-placeholder">Clique em CALCULAR para gerar a curva de degradação da bateria (SoH).</div>
-        </div>
-      </section>
-    </div>
-    
-    <!-- Botão de exportação PDF do relatório completo -->
-    <div class="action-bar pdf-report__bar" style="margin-top: var(--spacing-lg); margin-bottom: var(--spacing-lg);">
-      <button type="button" id="btn-pdf-report" class="btn btn-secondary pdf-report__btn" style="display: none; width: 100%;">
-        DOWNLOAD REPORT (PDF)
-      </button>
-    </div>
-  </main>
-
-  <!-- Carrega configurações locais e o client Supabase -->
-  <script src="config.js"></script>
-  <script src="supabase.js"></script>
-  
-  <!-- Injeta dinamicamente o App Bridge (Header e validação SSO) do Portal -->
-  <script>
-    (function() {
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
-      const bridgeScript = document.createElement('script');
-      if (isLocal) {
-        bridgeScript.src = 'mock-bridge.js';
-      } else {
-        bridgeScript.src = `${CONFIG.PORTAL_URL}assets/js/workbench-bridge.js`;
-      }
-      bridgeScript.defer = true;
-      document.head.appendChild(bridgeScript);
-    })();
-  </script>
-  
-  <!-- Script de lógica de negócios -->
-  <script src="app.js"></script>
+<script src="config.js"></script>
+<script src="supabase.js"></script>
+<script src="engine.js"></script>
+<script src="diagram.js"></script>
+<script src="app.js"></script>
+<script>
+  (function () {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /[?&]dev\b/.test(location.search)) { document.body.style.display = ''; return; }
+    const s = document.createElement('script');
+    s.src = `${CONFIG.PORTAL_URL}assets/js/workbench-bridge.js`;
+    s.defer = true;
+    document.head.appendChild(s);
+  })();
+</script>
 </body>
 </html>
