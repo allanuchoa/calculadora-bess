@@ -94,7 +94,7 @@
     }
 
     // chave de transferência e gerador
-    const yq = y + (pl.gerador ? 78 : 0);
+    const yq = y + (pl.gerador ? 134 : 0);
     if (pl.gerador) {
       const xg = cx + 164, yg = y + 14;
       o += box(xg, yg - 8, 86, 38, 'Gerador', 'Baixa tensão', C.ger) + L(xg, yg + 30, xg, yg + 40) + trafo(xg, yg + 56) + tx(xg + 16, yg + 54, 'TR-G', { a: 'start', w: 600 }) + tx(xg + 16, yg + 67, f(pl.kvaGerador) + ' kVA', { a: 'start', z: 9.5, c: C.sub });

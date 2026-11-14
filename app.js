@@ -171,12 +171,28 @@
 
   // ---------- diagrama: exportação ----------
   const svgText = () => { const n = $('#diagram svg').cloneNode(true), vb = n.viewBox.baseVal; n.setAttribute('width', vb.width * 2); n.setAttribute('height', vb.height * 2); return new XMLSerializer().serializeToString(n); };
-  function png() {
+  function png(type) {
     return new Promise((ok, no) => {
       const img = new Image(), url = URL.createObjectURL(new Blob([svgText()], { type: 'image/svg+xml' }));
-      img.onload = () => { const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; cv.getContext('2d').drawImage(img, 0, 0); URL.revokeObjectURL(url); cv.toBlob(ok, 'image/png'); };
+      img.onload = () => { const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0); URL.revokeObjectURL(url); cv.toBlob(ok, type || 'image/png', 0.95); };
       img.onerror = no; img.src = url;
     });
+  }
+  // PDF de uma página montado aqui (sem impressão do navegador); shortcut: o diagrama entra como imagem JPEG, não como vetor
+  async function pdf() {
+    const blob = await png('image/jpeg'), jpg = new Uint8Array(await blob.arrayBuffer()), vb = $('#diagram svg').viewBox.baseVal, W = Math.round(vb.width), H = Math.round(vb.height);
+    const te = new TextEncoder(), parts = [], off = []; let len = 0;
+    const put = b => { b = typeof b === 'string' ? te.encode(b) : b; parts.push(b); len += b.length; };
+    const obj = (i, body, bin) => { off[i] = len; put(i + ' 0 obj\n' + body); if (bin) { put(bin); put('\nendstream'); } put('\nendobj\n'); };
+    const c = `q ${W} 0 0 ${H} 0 0 cm /Im Do Q`, im = await createImageBitmap(blob);
+    put('%PDF-1.4\n');
+    obj(1, '<</Type/Catalog/Pages 2 0 R>>'); obj(2, '<</Type/Pages/Kids[3 0 R]/Count 1>>');
+    obj(3, `<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${W} ${H}]/Contents 4 0 R/Resources<</XObject<</Im 5 0 R>>>>>>`);
+    obj(4, `<</Length ${c.length}>>\nstream\n${c}\nendstream`);
+    obj(5, `<</Type/XObject/Subtype/Image/Width ${im.width}/Height ${im.height}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpg.length}>>\nstream\n`, jpg);
+    const xr = len;
+    put('xref\n0 6\n0000000000 65535 f \n' + [1, 2, 3, 4, 5].map(i => String(off[i]).padStart(10, '0') + ' 00000 n \n').join('') + `trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xr}\n%%EOF`);
+    return new Blob(parts, { type: 'application/pdf' });
   }
   function dl(blob, ext) {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -211,6 +227,7 @@
     $('#reset').addEventListener('click', () => { if (confirm('Descartar as premissas atuais e voltar ao exemplo inicial?')) { raw = {}; save(); fill(); render(); } });
     $('#print').addEventListener('click', () => { $$('details').forEach(d => { d.open = true; }); window.print(); });
     $('#dg-png').addEventListener('click', () => png().then(b => dl(b, 'png')).catch(() => toast('Não consegui gerar a imagem.')));
+    $('#dg-pdf').addEventListener('click', () => pdf().then(b => dl(b, 'pdf')).catch(() => toast('Não consegui gerar o PDF.')));
     $('#dg-svg').addEventListener('click', () => dl(new Blob([svgText()], { type: 'image/svg+xml' }), 'svg'));
     $('#dg-copy').addEventListener('click', () => png().then(b => navigator.clipboard.write([new ClipboardItem({ 'image/png': b })])).then(() => toast('Diagrama copiado.')).catch(() => toast('O navegador não deixou copiar. Use Baixar PNG.')));
     // menu lateral: marca a etapa visível
