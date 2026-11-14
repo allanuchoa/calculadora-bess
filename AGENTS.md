@@ -1,40 +1,31 @@
-<!-- AGENTS.md — Regras arquiteturais e lições aprendidas -->
+# Diretrizes para Agentes de IA - Calculadora BESS
 
-## Regras de Renderização e Ciclo de Vida do DOM
+Valem as diretrizes globais do Allan Workbench (HTML, CSS e JS puros; tema escuro; SSO pelo bridge).
 
-### 1. Reveal-Then-Render (nunca Render-Then-Reveal)
+## Arquitetura
 
-Contêineres de resultado devem ser tornados visíveis **antes** de qualquer renderização de gráfico/diagrama dentro deles. O ApexCharts (e bibliotecas similares de charting) dependem das dimensões visíveis do contêiner para calcular a largura/altura do widget. Renderizar antes de revelar produz gráficos com dimensão zero.
+- `engine.js` é puro (sem DOM) e exporta `BE`. Todo número da tela sai de `BE.run(premissas)`. Não calcule em `app.js`.
+- `diagram.js` é puro e exporta `BD`. `BD.draw(planta)` devolve o SVG, as notas e o plano (cabine, transformador, alocação).
+- `app.js` guarda só as premissas (`raw`), chama `BE.run` a cada edição e redesenha tudo.
+- Entrada salva ou digitada passa sempre por `BE.clean`, que confere tipo e limites.
+- Ferramenta neutra: nenhum nome de marca em texto, cálculo ou diagrama. O campo "modelo" é dado do usuário.
 
-**Certo:**
-```js
-revealContainer(container);
-renderChart(container, data);
-```
+## Convenções do motor
 
-**Errado:**
-```js
-renderChart(container, data);
-revealContainer(container);
-```
+- Unidades: kW, kWh, R$, %. Tudo por ciclo e no ponto de conexão.
+- Rendimento: um caminho = raiz do rendimento da bateria × conversor × transformadores × cabos. Os auxiliares saem da energia entregue. `rte = etaC × etaD`.
+- Unidades adotadas: `teto(exigido × (1 − déficit aceito))`, e o exigido é o maior entre energia e potência.
+- Estado de saúde: tabela de fabricante a 1 ciclo por dia; a parcela de calendário não depende do uso e o resto escala com ciclos por ano ÷ 365.
+- Frota: lista de conjuntos `{n, ano}`. Cada conjunto envelhece a partir do ano em que entrou.
+- Financeiro: fluxos no fim de cada ano; economia e operação reajustadas; energia do ano é a média entre o início e o fim.
 
-### 2. Exportação PNG sobre SVG para Conteúdo Misto
+## Diagramas
 
-Para exportação de conteúdo que combina HTML estilizado + gráficos (ex: relatório PDF), prefira **html2canvas + PNG** em vez de SVG foreignObject + svg2pdf.js. SVG foreignObject em jsPDF tem suporte inconsistente entre navegadores e requer inlining complexo de estilos (getComputedStyle + document.styleSheets). PNG via html2canvas é mais simples e confiável.
+- Paleta fixa de papel (fundo branco): o diagrama vai para relatório e slide.
+- Cor por entidade: rede bege, BESS e transferência azul, EMS roxo, gerador vermelho, transformador verde.
+- Distribuição em baixa tensão: unidades repartidas na proporção da potência dos transformadores (maiores restos).
+- Sempre com a nota de que proteções, seccionamentos e cabeamento não estão representados.
 
-### 3. Namespace CDN UMD vs Variáveis da Aplicação
+## Ao terminar
 
-Quando o Supabase JS SDK (ou qualquer biblioteca) é carregado via CDN (build UMD), o namespace global (`supabase`) é ocupado pelo SDK. Variáveis da aplicação com o mesmo nome colidem com o namespace do SDK, causando erros silenciosos.
-
-**Certo:** Nomeie a instância da aplicação de forma distinta:
-```js
-let supabaseDb = null;  // app-level reference
-// ... uso: supabaseDb.from('table')...
-```
-
-**Errado:** Usar o mesmo nome do namespace global do SDK:
-```js
-let supabase = null;  // colide com o namespace UMD do supabase-js
-```
-
-Prefira módulos ES (`import`) em vez de CDN UMD quando o ambiente suportar bundling. Se usar CDN, mantenha nomes distintos.
+Rode `node tests/engine.test.js` e `node tests/diagram.test.js`.

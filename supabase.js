@@ -8,33 +8,15 @@ function getSupabaseClient() {
       return null;
     }
     
-    // Protege contra URLs/keys vazias ou indefinidas na configuração local
-    if (typeof CONFIG === 'undefined' || !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY) {
-      console.warn("Supabase não configurado. Sincronização e autenticação desabilitadas.");
-      return null;
-    }
-    
-    try {
-      supabaseClientInstance = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          storageKey: `sb-${CONFIG.SUPABASE_PROJECT_ID || 'bess'}-auth-token`
-        }
-      });
-    } catch (err) {
-      console.error("Falha ao inicializar o cliente Supabase:", err);
-      return null;
-    }
+    supabaseClientInstance = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        storageKey: `sb-${CONFIG.SUPABASE_PROJECT_ID}-auth-token`
+      }
+    });
   }
   return supabaseClientInstance;
 }
 
-// Inicializa a instância global se possível, mas de forma segura.
-// Nome distinto de "supabase" para não colidir com o namespace global do SDK (CDN UMD).
-let supabaseDb = null;
-try {
-  supabaseDb = getSupabaseClient();
-} catch (e) {
-  console.warn("Erro ao instanciar o Supabase globalmente:", e);
-}
-
+// // Inicializa a instância global
+// const supabase = getSupabaseClient();

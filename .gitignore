@@ -41,3 +41,7 @@ mock-bridge.js
 .codegraph/
 .opencode/
 
+
+# Versao anterior, mantida so localmente
+versao-antiga/
+.claude/
